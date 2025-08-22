@@ -11,7 +11,7 @@
 # =============================================================================
 
 # =============================================================================
-# Project: rookie
+# Project: ChessEngine
 # Configurations: Debug
 # =============================================================================
 
@@ -41,39 +41,39 @@ include CMakeFiles/rules.ninja
 
 cmake_ninja_workdir = C$:/projects/chess-engine/build/
 # =============================================================================
-# Object build statements for EXECUTABLE target rookie
+# Object build statements for EXECUTABLE target ChessEngine
 
 
 #############################################
-# Order-only phony target for rookie
+# Order-only phony target for ChessEngine
 
-build cmake_object_order_depends_target_rookie: phony || .
+build cmake_object_order_depends_target_ChessEngine: phony || .
 
-build CMakeFiles/rookie.dir/src/main.cpp.obj: CXX_COMPILER__rookie_unscanned_Debug C$:/projects/chess-engine/src/main.cpp || cmake_object_order_depends_target_rookie
+build CMakeFiles/ChessEngine.dir/src/main.cpp.obj: CXX_COMPILER__ChessEngine_unscanned_Debug C$:/projects/chess-engine/src/main.cpp || cmake_object_order_depends_target_ChessEngine
   CONFIG = Debug
-  DEP_FILE = CMakeFiles\rookie.dir\src\main.cpp.obj.d
+  DEP_FILE = CMakeFiles\ChessEngine.dir\src\main.cpp.obj.d
   FLAGS = -g -std=gnu++20 -Wall -Wextra -Wpedantic
-  OBJECT_DIR = CMakeFiles\rookie.dir
-  OBJECT_FILE_DIR = CMakeFiles\rookie.dir\src
+  OBJECT_DIR = CMakeFiles\ChessEngine.dir
+  OBJECT_FILE_DIR = CMakeFiles\ChessEngine.dir\src
 
 
 # =============================================================================
-# Link build statements for EXECUTABLE target rookie
+# Link build statements for EXECUTABLE target ChessEngine
 
 
 #############################################
-# Link the executable rookie.exe
+# Link the executable ChessEngine.exe
 
-build rookie.exe: CXX_EXECUTABLE_LINKER__rookie_Debug CMakeFiles/rookie.dir/src/main.cpp.obj
+build ChessEngine.exe: CXX_EXECUTABLE_LINKER__ChessEngine_Debug CMakeFiles/ChessEngine.dir/src/main.cpp.obj
   CONFIG = Debug
   FLAGS = -g
   LINK_LIBRARIES = -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
-  OBJECT_DIR = CMakeFiles\rookie.dir
+  OBJECT_DIR = CMakeFiles\ChessEngine.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
-  TARGET_FILE = rookie.exe
-  TARGET_IMPLIB = librookie.dll.a
-  TARGET_PDB = rookie.exe.dbg
+  TARGET_FILE = ChessEngine.exe
+  TARGET_IMPLIB = libChessEngine.dll.a
+  TARGET_PDB = ChessEngine.exe.dbg
 
 
 #############################################
@@ -101,7 +101,7 @@ build rebuild_cache: phony CMakeFiles/rebuild_cache.util
 # =============================================================================
 # Target aliases.
 
-build rookie: phony rookie.exe
+build ChessEngine: phony ChessEngine.exe
 
 # =============================================================================
 # Folder targets.
@@ -111,7 +111,7 @@ build rookie: phony rookie.exe
 #############################################
 # Folder: C:/projects/chess-engine/build
 
-build all: phony rookie.exe
+build all: phony ChessEngine.exe
 
 # =============================================================================
 # Built-in targets

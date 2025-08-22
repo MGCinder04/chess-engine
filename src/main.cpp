@@ -511,8 +511,9 @@ int main()
     {
         if (line == "uci")
         {
-            cout << "id name RookieBB\nid author You\nuciok\n";
+            cout << "id name ChessEngine\nid author You\nuciok\n";
         }
+
         else if (line == "isready")
         {
             cout << "readyok\n";

@@ -1,4 +1,3 @@
 # ninja log v7
-9	4175	7775993797074804	CMakeFiles/rookie.dir/src/main.cpp.obj	2ec22714b92c81dc
-4429	4736	7775990576948755	rookie.exe	ed9a4dc4edf56f6b
-11	435	7775994077624709	rookie.exe	ed9a4dc4edf56f6b
+5	4458	7776005631614882	CMakeFiles/ChessEngine.dir/src/main.cpp.obj	7ea0e2cadbd4e760
+4475	4803	7776005676321461	ChessEngine.exe	d7cd97136ecaee7f
