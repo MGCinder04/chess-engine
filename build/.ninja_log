@@ -1,3 +1,5 @@
 # ninja log v7
-5	4458	7776005631614882	CMakeFiles/ChessEngine.dir/src/main.cpp.obj	7ea0e2cadbd4e760
-4475	4803	7776005676321461	ChessEngine.exe	d7cd97136ecaee7f
+10	4375	7776021427179527	CMakeFiles/ChessEngine.dir/src/main.cpp.obj	7ea0e2cadbd4e760
+4377	4729	7776021470853344	ChessEngine.exe	d7cd97136ecaee7f
+12	4225	7776023147640363	CMakeFiles/ChessEngine.dir/src/main.cpp.obj	7ea0e2cadbd4e760
+4226	4556	7776023189767046	ChessEngine.exe	d7cd97136ecaee7f

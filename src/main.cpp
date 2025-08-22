@@ -108,6 +108,12 @@ static inline int poplsb(U64 &b)
     return s;
 }
 
+// Castling rights bitmask
+constexpr uint8_t W_K = 1; // White king-side
+constexpr uint8_t W_Q = 2; // White queen-side
+constexpr uint8_t B_K = 4; // Black king-side
+constexpr uint8_t B_Q = 8; // Black queen-side
+
 U64 KNIGHT_ATK[64], KING_ATK[64], PAWN_ATK[2][64];
 U64 RAY_N[64], RAY_S[64], RAY_E[64], RAY_W[64], RAY_NE[64], RAY_NW[64], RAY_SE[64], RAY_SW[64];
 
@@ -199,6 +205,10 @@ struct Position
     Side stm = WHITE;
     int kingSq[2]{E1, E8};
 
+    // add
+    uint8_t castle = (W_K | W_Q | B_K | B_Q);
+    int epSq = -1;
+
     void updateOcc()
     {
         occ[WHITE] = occ[BLACK] = 0ull;
@@ -226,6 +236,8 @@ struct Position
         bb12[WK] = sqbb(E1);
         bb12[BK] = sqbb(E8);
         stm = WHITE;
+        castle = (W_K | W_Q | B_K | B_Q);
+        epSq = -1;
         updateOcc();
     }
 };
@@ -312,11 +324,15 @@ struct Move
     uint16_t from, to;
     uint8_t promo{0};
 };
+
 struct Undo
 {
     Move m;
     int capPiece{NO_PIECE};
+    int capSq{-1}; // square where capture was removed (for EP)
     Side stm;
+    uint8_t prevCastle{0};
+    int prevEp{-1};
 };
 
 int pieceAt(const Position &P, int s)
@@ -329,6 +345,10 @@ int pieceAt(const Position &P, int s)
 }
 static inline void place(Position &P, int p, int s) { P.bb12[p] |= sqbb((unsigned)s); }
 static inline void removeP(Position &P, int p, int s) { P.bb12[p] &= ~sqbb((unsigned)s); }
+inline bool sqEmpty(const Position &P, int sq)
+{
+    return (P.occAll & (1ull << sq)) == 0;
+}
 
 template <Side S>
 void genPseudo(const Position &P, vector<Move> &out)
@@ -388,6 +408,18 @@ void genPseudo(const Position &P, vector<Move> &out)
         }
     }
 
+    // --- En passant pseudo captures ---
+    if (P.epSq != -1)
+    {
+        int to = P.epSq;
+        U64 epAttackers = PBB & PAWN_ATK[S][to];
+        while (epAttackers)
+        {
+            int from = poplsb(epAttackers);
+            out.push_back({(uint16_t)from, (uint16_t)to, 0});
+        }
+    }
+
     auto push = [&](int f, U64 t)
     {
         t &= ~own;
@@ -428,6 +460,42 @@ void genPseudo(const Position &P, vector<Move> &out)
     }
     int f = P.kingSq[S];
     push(f, KING_ATK[f]);
+
+    // --- Castling (pseudo, with safety checks) ---
+    if constexpr (S == WHITE)
+    {
+        // King-side: E1 -> G1 (rook H1 -> F1)
+        if ((P.castle & W_K) &&
+            sqEmpty(P, F1) && sqEmpty(P, G1) &&
+            !sqAttacked(P, E1, BLACK) && !sqAttacked(P, F1, BLACK) && !sqAttacked(P, G1, BLACK))
+        {
+            out.push_back({(uint16_t)E1, (uint16_t)G1, 0});
+        }
+        // Queen-side: E1 -> C1 (rook A1 -> D1)
+        if ((P.castle & W_Q) &&
+            sqEmpty(P, D1) && sqEmpty(P, C1) && sqEmpty(P, B1) &&
+            !sqAttacked(P, E1, BLACK) && !sqAttacked(P, D1, BLACK) && !sqAttacked(P, C1, BLACK))
+        {
+            out.push_back({(uint16_t)E1, (uint16_t)C1, 0});
+        }
+    }
+    else
+    {
+        // King-side: E8 -> G8 (rook H8 -> F8)
+        if ((P.castle & B_K) &&
+            sqEmpty(P, F8) && sqEmpty(P, G8) &&
+            !sqAttacked(P, E8, WHITE) && !sqAttacked(P, F8, WHITE) && !sqAttacked(P, G8, WHITE))
+        {
+            out.push_back({(uint16_t)E8, (uint16_t)G8, 0});
+        }
+        // Queen-side: E8 -> C8 (rook A8 -> D8)
+        if ((P.castle & B_Q) &&
+            sqEmpty(P, D8) && sqEmpty(P, C8) && sqEmpty(P, B8) &&
+            !sqAttacked(P, E8, WHITE) && !sqAttacked(P, D8, WHITE) && !sqAttacked(P, C8, WHITE))
+        {
+            out.push_back({(uint16_t)E8, (uint16_t)C8, 0});
+        }
+    }
 }
 
 void makeMove(Position &P, const Move &m, Undo &u)
@@ -435,28 +503,153 @@ void makeMove(Position &P, const Move &m, Undo &u)
     u.stm = P.stm;
     u.m = m;
     u.capPiece = NO_PIECE;
-    int moving = pieceAt(P, m.from), cap = pieceAt(P, m.to);
-    if (cap != NO_PIECE)
+    u.capSq = -1;
+    u.prevCastle = P.castle;
+    u.prevEp = P.epSq;
+
+    int moving = pieceAt(P, m.from);
+    int cap = pieceAt(P, m.to);
+
+    // En passant capture detection (destination empty but epSq matches)
+    bool isPawn = (moving == WP || moving == BP);
+    bool isEP = isPawn && (m.to == P.epSq) && (cap == NO_PIECE);
+    if (isEP)
     {
-        u.capPiece = cap; // <-- remember what we captured
+        int takenSq = (P.stm == WHITE ? m.to - 8 : m.to + 8);
+        u.capPiece = (P.stm == WHITE ? BP : WP);
+        u.capSq = takenSq;
+        removeP(P, u.capPiece, takenSq);
+    }
+    else if (cap != NO_PIECE)
+    {
+        u.capPiece = cap;
+        u.capSq = m.to;
         removeP(P, cap, m.to);
     }
 
+    // Move piece
     removeP(P, moving, m.from);
     int placeAs = m.promo ? m.promo : moving;
     place(P, placeAs, m.to);
+
+    // Castling move: king moved two squares -> move rook
+    if (moving == WK && std::abs(m.to - m.from) == 2)
+    {
+        // White castling
+        if (m.to == G1)
+        { // O-O
+            removeP(P, WR, H1);
+            place(P, WR, F1);
+        }
+        else if (m.to == C1)
+        { // O-O-O
+            removeP(P, WR, A1);
+            place(P, WR, D1);
+        }
+    }
+    if (moving == BK && std::abs(m.to - m.from) == 2)
+    {
+        // Black castling
+        if (m.to == G8)
+        { // O-O
+            removeP(P, BR, H8);
+            place(P, BR, F8);
+        }
+        else if (m.to == C8)
+        { // O-O-O
+            removeP(P, BR, A8);
+            place(P, BR, D8);
+        }
+    }
+
+    // Update castling rights (king/rook moves or rook captured on original squares)
+    auto clearCastleOnRookSq = [&](int sq)
+    {
+        if (sq == H1)
+            P.castle &= ~W_K;
+        if (sq == A1)
+            P.castle &= ~W_Q;
+        if (sq == H8)
+            P.castle &= ~B_K;
+        if (sq == A8)
+            P.castle &= ~B_Q;
+    };
+    if (moving == WK)
+    {
+        P.castle &= ~(W_K | W_Q);
+    }
+    if (moving == BK)
+    {
+        P.castle &= ~(B_K | B_Q);
+    }
+    if (moving == WR)
+        clearCastleOnRookSq(m.from);
+    if (moving == BR)
+        clearCastleOnRookSq(m.from);
+    if (u.capPiece == WR || u.capPiece == BR)
+        clearCastleOnRookSq(u.capSq);
+
+    // Set EP square
+    P.epSq = -1;
+    if (isPawn && std::abs(m.to - m.from) == 16)
+    {
+        P.epSq = (m.to + m.from) / 2;
+    }
+
+    // Finish
     P.updateOcc();
     P.stm = (P.stm == WHITE) ? BLACK : WHITE;
 }
+
 void unmakeMove(Position &P, const Undo &u)
 {
     P.stm = u.stm;
+    P.castle = u.prevCastle;
+    P.epSq = u.prevEp;
+
     int moved = pieceAt(P, u.m.to);
+    // Undo castling rook move if needed (detect by king moving two squares)
+    if ((moved == WK || moved == BK) && std::abs(u.m.to - u.m.from) == 2)
+    {
+        if (moved == WK)
+        {
+            if (u.m.to == G1)
+            {
+                removeP(P, WR, F1);
+                place(P, WR, H1);
+            }
+            else if (u.m.to == C1)
+            {
+                removeP(P, WR, D1);
+                place(P, WR, A1);
+            }
+        }
+        else
+        {
+            if (u.m.to == G8)
+            {
+                removeP(P, BR, F8);
+                place(P, BR, H8);
+            }
+            else if (u.m.to == C8)
+            {
+                removeP(P, BR, D8);
+                place(P, BR, A8);
+            }
+        }
+    }
+
+    // Move main piece back
     removeP(P, moved, u.m.to);
     int orig = u.m.promo ? (u.stm == WHITE ? WP : BP) : moved;
     place(P, orig, u.m.from);
-    if (u.capPiece != NO_PIECE)
-        place(P, u.capPiece, u.m.to);
+
+    // Restore capture (including EP)
+    if (u.capPiece != NO_PIECE && u.capSq != -1)
+    {
+        place(P, u.capPiece, u.capSq);
+    }
+
     P.updateOcc();
 }
 
