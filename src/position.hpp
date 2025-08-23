@@ -41,3 +41,8 @@ void legalMoves(Position &P, std::vector<Move> &out);
 // Perft (testing)
 std::uint64_t perft(Position &P, int d);
 void perftSplit(Position &P, int depth);
+
+
+// NEW: apply UCI moves to the current position
+bool applyUCIMove(Position &P, const std::string &uci);              // e.g., "e2e4", "a7a8q"
+bool applyUCIMoves(Position &P, const std::vector<std::string> &ms); // applies all, returns false if any fail

@@ -22,5 +22,11 @@
   "command": "C:\\msys64\\ucrt64\\bin\\c++.exe -g -std=gnu++20 -Wall -Wextra -Wpedantic -o CMakeFiles\\ChessEngine.dir\\src\\position.cpp.obj -c C:\\projects\\chess-engine\\src\\position.cpp",
   "file": "C:/projects/chess-engine/src/position.cpp",
   "output": "C:/projects/chess-engine/build/CMakeFiles/ChessEngine.dir/src/position.cpp.obj"
+},
+{
+  "directory": "C:/projects/chess-engine/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\c++.exe -g -std=gnu++20 -Wall -Wextra -Wpedantic -o CMakeFiles\\ChessEngine.dir\\src\\fen.cpp.obj -c C:\\projects\\chess-engine\\src\\fen.cpp",
+  "file": "C:/projects/chess-engine/src/fen.cpp",
+  "output": "C:/projects/chess-engine/build/CMakeFiles/ChessEngine.dir/src/fen.cpp.obj"
 }
 ]

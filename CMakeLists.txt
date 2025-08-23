@@ -17,11 +17,14 @@ add_executable(ChessEngine
   src/uci.cpp
   src/attacks.cpp
   src/position.cpp
-  # headers aren’t compiled but listing helps IDEs
+  src/fen.cpp           # 👈 add this
+  # headers optional for IDEs
   src/attacks.hpp
   src/position.hpp
   src/chess_types.hpp
+  src/fen.hpp           # 👈 add this (optional)
 )
+
 
 # Good warnings on MinGW
 if (MINGW)

@@ -1,9 +1,10 @@
 # ninja log v7
-13	1007	7776813356045581	CMakeFiles/ChessEngine.dir/src/main.cpp.obj	7ea0e2cadbd4e760
-1980	2350	7776815638765866	ChessEngine.exe	72d1a0ae55692458
-125	772	7776813357166825	CMakeFiles/ChessEngine.dir/src/attacks.cpp.obj	f81362ae3b205297
-60	1384	7776813356512261	CMakeFiles/ChessEngine.dir/src/uci.cpp.obj	2292ffb0d5eed9a2
-11	1978	7776815619085766	CMakeFiles/ChessEngine.dir/src/position.cpp.obj	e5807922240fb5d7
-11	1233	7776817958405870	CMakeFiles/ChessEngine.dir/src/uci.cpp.obj	2292ffb0d5eed9a2
-54	1976	7776817958838751	CMakeFiles/ChessEngine.dir/src/position.cpp.obj	e5807922240fb5d7
-1977	2366	7776817978059103	ChessEngine.exe	72d1a0ae55692458
+10	865	7776844389746755	CMakeFiles/ChessEngine.dir/src/main.cpp.obj	7ea0e2cadbd4e760
+1923	2342	7776897192655503	ChessEngine.exe	a42ea036e000659a
+125	646	7776844390897889	CMakeFiles/ChessEngine.dir/src/attacks.cpp.obj	f81362ae3b205297
+10	1682	7776897173525626	CMakeFiles/ChessEngine.dir/src/uci.cpp.obj	2292ffb0d5eed9a2
+66	1922	7776897174104296	CMakeFiles/ChessEngine.dir/src/position.cpp.obj	e5807922240fb5d7
+181	1594	7776897175243160	CMakeFiles/ChessEngine.dir/src/fen.cpp.obj	320c2a5e340fa89b
+9	1179	7776906412836261	CMakeFiles/ChessEngine.dir/src/uci.cpp.obj	2292ffb0d5eed9a2
+44	1186	7776906413183742	CMakeFiles/ChessEngine.dir/src/fen.cpp.obj	320c2a5e340fa89b
+1186	1556	7776906424610181	ChessEngine.exe	a42ea036e000659a
