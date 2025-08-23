@@ -56,6 +56,27 @@ build CMakeFiles/ChessEngine.dir/src/main.cpp.obj: CXX_COMPILER__ChessEngine_uns
   OBJECT_DIR = CMakeFiles\ChessEngine.dir
   OBJECT_FILE_DIR = CMakeFiles\ChessEngine.dir\src
 
+build CMakeFiles/ChessEngine.dir/src/uci.cpp.obj: CXX_COMPILER__ChessEngine_unscanned_Debug C$:/projects/chess-engine/src/uci.cpp || cmake_object_order_depends_target_ChessEngine
+  CONFIG = Debug
+  DEP_FILE = CMakeFiles\ChessEngine.dir\src\uci.cpp.obj.d
+  FLAGS = -g -std=gnu++20 -Wall -Wextra -Wpedantic
+  OBJECT_DIR = CMakeFiles\ChessEngine.dir
+  OBJECT_FILE_DIR = CMakeFiles\ChessEngine.dir\src
+
+build CMakeFiles/ChessEngine.dir/src/attacks.cpp.obj: CXX_COMPILER__ChessEngine_unscanned_Debug C$:/projects/chess-engine/src/attacks.cpp || cmake_object_order_depends_target_ChessEngine
+  CONFIG = Debug
+  DEP_FILE = CMakeFiles\ChessEngine.dir\src\attacks.cpp.obj.d
+  FLAGS = -g -std=gnu++20 -Wall -Wextra -Wpedantic
+  OBJECT_DIR = CMakeFiles\ChessEngine.dir
+  OBJECT_FILE_DIR = CMakeFiles\ChessEngine.dir\src
+
+build CMakeFiles/ChessEngine.dir/src/position.cpp.obj: CXX_COMPILER__ChessEngine_unscanned_Debug C$:/projects/chess-engine/src/position.cpp || cmake_object_order_depends_target_ChessEngine
+  CONFIG = Debug
+  DEP_FILE = CMakeFiles\ChessEngine.dir\src\position.cpp.obj.d
+  FLAGS = -g -std=gnu++20 -Wall -Wextra -Wpedantic
+  OBJECT_DIR = CMakeFiles\ChessEngine.dir
+  OBJECT_FILE_DIR = CMakeFiles\ChessEngine.dir\src
+
 
 # =============================================================================
 # Link build statements for EXECUTABLE target ChessEngine
@@ -64,7 +85,7 @@ build CMakeFiles/ChessEngine.dir/src/main.cpp.obj: CXX_COMPILER__ChessEngine_uns
 #############################################
 # Link the executable ChessEngine.exe
 
-build ChessEngine.exe: CXX_EXECUTABLE_LINKER__ChessEngine_Debug CMakeFiles/ChessEngine.dir/src/main.cpp.obj
+build ChessEngine.exe: CXX_EXECUTABLE_LINKER__ChessEngine_Debug CMakeFiles/ChessEngine.dir/src/main.cpp.obj CMakeFiles/ChessEngine.dir/src/uci.cpp.obj CMakeFiles/ChessEngine.dir/src/attacks.cpp.obj CMakeFiles/ChessEngine.dir/src/position.cpp.obj
   CONFIG = Debug
   FLAGS = -g
   LINK_LIBRARIES = -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32

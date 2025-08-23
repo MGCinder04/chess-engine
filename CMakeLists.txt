@@ -4,10 +4,26 @@ project(ChessEngine LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(ChessEngine src/main.cpp)
+# Default to Release if not provided (good perf)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
 
-# Good warnings + optimize for release builds
+# (Optional) help VS Code intellisense
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+add_executable(ChessEngine
+  src/main.cpp
+  src/uci.cpp
+  src/attacks.cpp
+  src/position.cpp
+  # headers aren’t compiled but listing helps IDEs
+  src/attacks.hpp
+  src/position.hpp
+  src/chess_types.hpp
+)
+
+# Good warnings on MinGW
 if (MINGW)
   target_compile_options(ChessEngine PRIVATE -Wall -Wextra -Wpedantic)
 endif()
-

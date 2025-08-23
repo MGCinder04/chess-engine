@@ -1,0 +1,26 @@
+[
+{
+  "directory": "C:/projects/chess-engine/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\c++.exe -g -std=gnu++20 -Wall -Wextra -Wpedantic -o CMakeFiles\\ChessEngine.dir\\src\\main.cpp.obj -c C:\\projects\\chess-engine\\src\\main.cpp",
+  "file": "C:/projects/chess-engine/src/main.cpp",
+  "output": "C:/projects/chess-engine/build/CMakeFiles/ChessEngine.dir/src/main.cpp.obj"
+},
+{
+  "directory": "C:/projects/chess-engine/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\c++.exe -g -std=gnu++20 -Wall -Wextra -Wpedantic -o CMakeFiles\\ChessEngine.dir\\src\\uci.cpp.obj -c C:\\projects\\chess-engine\\src\\uci.cpp",
+  "file": "C:/projects/chess-engine/src/uci.cpp",
+  "output": "C:/projects/chess-engine/build/CMakeFiles/ChessEngine.dir/src/uci.cpp.obj"
+},
+{
+  "directory": "C:/projects/chess-engine/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\c++.exe -g -std=gnu++20 -Wall -Wextra -Wpedantic -o CMakeFiles\\ChessEngine.dir\\src\\attacks.cpp.obj -c C:\\projects\\chess-engine\\src\\attacks.cpp",
+  "file": "C:/projects/chess-engine/src/attacks.cpp",
+  "output": "C:/projects/chess-engine/build/CMakeFiles/ChessEngine.dir/src/attacks.cpp.obj"
+},
+{
+  "directory": "C:/projects/chess-engine/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\c++.exe -g -std=gnu++20 -Wall -Wextra -Wpedantic -o CMakeFiles\\ChessEngine.dir\\src\\position.cpp.obj -c C:\\projects\\chess-engine\\src\\position.cpp",
+  "file": "C:/projects/chess-engine/src/position.cpp",
+  "output": "C:/projects/chess-engine/build/CMakeFiles/ChessEngine.dir/src/position.cpp.obj"
+}
+]
