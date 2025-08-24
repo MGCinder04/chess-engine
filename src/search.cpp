@@ -1,5 +1,8 @@
 #include "search.hpp"
 #include "eval.hpp"
+#include "tt.hpp"
+#include "zobrist.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -7,11 +10,36 @@
 
 using namespace std;
 
+// ---- forward decl for functions that call negamax ----
+static int negamax(Position &P, int depth, int alpha, int beta, int ply);
+
+// ---- TT instance ----
+static TT g_tt(64); // 64 MB
+
+// ---- constants ----
 static constexpr int INF     = 32000;
 static constexpr int MATE    = 30000;
 static constexpr int MAX_PLY = 64;
 
-// ===== helpers (local, no header edits needed) =====
+// ---- mate-score encode/decode for TT ----
+static inline int to_tt_score(int sc, int ply)
+{
+    if (sc > MATE - 1000)
+        return sc + ply;
+    if (sc < -MATE + 1000)
+        return sc - ply;
+    return sc;
+}
+static inline int from_tt_score(int sc, int ply)
+{
+    if (sc > MATE - 1000)
+        return sc - ply;
+    if (sc < -MATE + 1000)
+        return sc + ply;
+    return sc;
+}
+
+// ===== helpers =====
 static inline int pieceAt(const Position &P, int s)
 {
     U64 m = sqbb((unsigned) s);
@@ -46,7 +74,7 @@ static inline int mvvLvaScore(int attacker, int victim)
     return pieceValue12[victim] * 16 - (attacker != NO_PIECE ? pieceValue12[attacker] : 0);
 }
 
-// ===== make / unmake (copied from your perft block semantics) =====
+// ===== make / unmake (local) =====
 struct UndoLocal
 {
     Move m;
@@ -140,27 +168,22 @@ static void doMoveLocal(Position &P, const Move &m, UndoLocal &u)
     if (u.capPiece != NO_PIECE && u.capSq != -1)
         clearCastleOnRookSq(u.capSq);
 
-    // ep square
+    // ep
     P.epSq = -1;
     if (isPawn && abs((int) m.to - (int) m.from) == 16)
-    {
         P.epSq = (P.stm == WHITE ? (m.from + 8) : (m.from - 8));
-    }
 
-    // side to move, occ
     P.stm = (P.stm == WHITE ? BLACK : WHITE);
     P.updateOcc();
 }
 
 static void undoMoveLocal(Position &P, const UndoLocal &u)
 {
-    // side and ep/castle
     P.stm    = u.stm;
     P.epSq   = u.prevEp;
     P.castle = u.prevCastle;
 
     int moved = u.movedPiece;
-    // revert rook if it was castling
     if (moved == WK && abs(u.m.to - u.m.from) == 2)
     {
         if (u.m.to == G1)
@@ -188,12 +211,10 @@ static void undoMoveLocal(Position &P, const UndoLocal &u)
         }
     }
 
-    // move piece back (un-promote if needed)
     removeP(P, moved, u.m.to);
     int orig = u.m.promo ? (u.stm == WHITE ? WP : BP) : moved;
     place(P, orig, u.m.from);
 
-    // restore capture
     if (u.capPiece != NO_PIECE && u.capSq != -1)
         place(P, u.capPiece, u.capSq);
 
@@ -211,25 +232,17 @@ static int scoreMove(const Position &P, const Move &m, int ply)
     if (captured != NO_PIECE)
         return 100000 + mvvLvaScore(moving, captured);
 
-    // killers
     if (killer1[ply].from == m.from && killer1[ply].to == m.to && killer1[ply].promo == m.promo)
         return 90000;
     if (killer2[ply].from == m.from && killer2[ply].to == m.to && killer2[ply].promo == m.promo)
         return 80000;
 
-    // history
     if (moving != NO_PIECE)
         return 1000 + (int) historyTable[moving][m.to];
-
     return 0;
 }
-static void orderMoves(Position &P, vector<Move> &mv, int ply)
-{
-    sort(mv.begin(), mv.end(),
-         [&](const Move &a, const Move &b) { return scoreMove(P, a, ply) > scoreMove(P, b, ply); });
-}
 
-// --- Quiescence search: extend leaf nodes with captures ---
+// --- Quiescence search ---
 static int quiesce(Position &P, int alpha, int beta)
 {
     int standPat = (P.stm == WHITE ? +1 : -1) * evaluate(P);
@@ -241,15 +254,10 @@ static int quiesce(Position &P, int alpha, int beta)
     vector<Move> moves;
     legalMoves(P, moves);
 
-    // Only consider captures
     moves.erase(remove_if(moves.begin(), moves.end(),
-                          [&](const Move &m)
-                          {
-                              return pieceAt(P, m.to) == NO_PIECE && m.promo == 0; // keep captures/promos
-                          }),
+                          [&](const Move &m) { return pieceAt(P, m.to) == NO_PIECE && m.promo == 0; }),
                 moves.end());
 
-    // Order captures (MVV/LVA)
     sort(moves.begin(), moves.end(),
          [&](const Move &a, const Move &b)
          {
@@ -272,31 +280,149 @@ static int quiesce(Position &P, int alpha, int beta)
     return alpha;
 }
 
+// ===== helpers for pruning/reductions =====
+static bool inCheck(const Position &P)
+{
+    return sqAttacked(P, P.kingSq[P.stm], (P.stm == WHITE ? BLACK : WHITE));
+}
+
+static int null_move_prune(Position &P, int depth, int alpha, int beta, int ply)
+{
+    (void) alpha; // suppress unused warning
+    if (depth < 3 || inCheck(P))
+        return -INF;
+
+    int prevEp = P.epSq;
+    P.stm      = (P.stm == WHITE ? BLACK : WHITE);
+    P.epSq     = -1;
+    P.updateOcc();
+
+    int R     = 2 + (depth > 6);
+    int score = -negamax(P, depth - 1 - R, -beta, -beta + 1, ply + 1);
+
+    P.stm  = (P.stm == WHITE ? BLACK : WHITE);
+    P.epSq = prevEp;
+    P.updateOcc();
+
+    return score;
+}
+
+static inline bool isCapture(const Position &P, const Move &m)
+{
+    if (m.promo)
+        return true;
+    U64 msk = sqbb((unsigned) m.to);
+    for (int p = WP; p <= BK; ++p)
+        if (P.bb12[p] & msk)
+            return true;
+    return false;
+}
+static bool givesCheck(Position &P, const Move &m)
+{
+    UndoLocal u{};
+    doMoveLocal(P, m, u);
+    bool chk = sqAttacked(P, P.kingSq[P.stm], (P.stm == WHITE ? BLACK : WHITE));
+    undoMoveLocal(P, u);
+    return chk;
+}
+
 // ===== negamax =====
 static int negamax(Position &P, int depth, int alpha, int beta, int ply)
 {
-    pvLen[ply] = 0;
+    int origAlpha = alpha;
+    pvLen[ply]    = 0;
+
+    uint64_t key = compute_zobrist(P);
+
+    // TT probe
+    if (TTEntry *e = g_tt.probe(key); e->key == key)
+    {
+        int ttScore = from_tt_score(e->score, ply);
+        if (e->depth >= depth)
+        {
+            if (e->flag == TT_EXACT)
+                return ttScore;
+            else if (e->flag == TT_LOWER && ttScore > alpha)
+                alpha = ttScore;
+            else if (e->flag == TT_UPPER && ttScore < beta)
+                beta = ttScore;
+            if (alpha >= beta)
+                return ttScore;
+        }
+    }
 
     if (depth == 0)
         return quiesce(P, alpha, beta);
 
-    vector<Move> mv;
-    legalMoves(P, mv);
-    if (mv.empty())
+    // Null-move try
+    int nm = null_move_prune(P, depth, alpha, beta, ply);
+    if (nm >= beta)
     {
-        bool inCheck = sqAttacked(P, P.kingSq[P.stm], (P.stm == WHITE ? BLACK : WHITE));
-        return inCheck ? -(MATE - ply) : 0;
+        g_tt.store(key, depth, to_tt_score(nm, ply), TT_LOWER, Move{});
+        return nm;
     }
 
-    orderMoves(P, mv, ply);
+    vector<Move> mv;
+    legalMoves(P, mv);
+
+    Move ttMove{};
+    if (TTEntry *e = g_tt.probe(key); e->key == key)
+        ttMove = e->move;
+
+    auto moveScore = [&](const Move &m, int plyIdx)
+    {
+        int base = scoreMove(P, m, plyIdx);
+        if (ttMove.from == m.from && ttMove.to == m.to && ttMove.promo == m.promo)
+            base += 200000;
+        return base;
+    };
+    sort(mv.begin(), mv.end(), [&](const Move &a, const Move &b) { return moveScore(a, ply) > moveScore(b, ply); });
+
+    if (mv.empty())
+    {
+        bool check = sqAttacked(P, P.kingSq[P.stm], (P.stm == WHITE ? BLACK : WHITE));
+        return check ? -(MATE - ply) : 0;
+    }
 
     int bestScore = -INF;
     Move bestMove{};
+    int moveIndex = 0;
+
     for (const Move &m : mv)
     {
+        int d = depth - 1;
+
+        // LMR for later, quiet, non-check moves
+        bool cap      = isCapture(P, m);
+        bool chk      = false;
+        int reduction = 0;
+        if (depth >= 3 && moveIndex >= 3 && !cap)
+        {
+            chk = givesCheck(P, m);
+            if (!chk)
+                reduction = 1 + (moveIndex > 8);
+        }
+
         UndoLocal u{};
         doMoveLocal(P, m, u);
-        int sc = -negamax(P, depth - 1, -beta, -alpha, ply + 1);
+
+        int sc = -negamax(P, d - reduction, -alpha, -alpha - 1, ply + 1); // null-window first
+        if (reduction && sc > alpha)
+        {
+            sc = -negamax(P, d, -beta, -alpha, ply + 1); // re-search
+        }
+        else if (!reduction)
+        {
+            if (moveIndex == 0)
+                sc = -negamax(P, d, -beta, -alpha, ply + 1); // full for first
+            else
+            {
+                sc = -negamax(P, d, -alpha - 1, -alpha, ply + 1);
+                if (sc > alpha && sc < beta)
+                    sc = -negamax(P, d, -beta, -alpha, ply + 1);
+            }
+        }
+
         undoMoveLocal(P, u);
 
         if (sc > bestScore)
@@ -304,7 +430,6 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
             bestScore = sc;
             bestMove  = m;
 
-            // update PV
             pvTable[ply][ply] = m;
             for (int i = 0; i < pvLen[ply + 1]; ++i)
                 pvTable[ply][ply + 1 + i] = pvTable[ply + 1][ply + 1 + i];
@@ -315,7 +440,6 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
             alpha = bestScore;
         if (alpha >= beta)
         {
-            // killers + history
             if (!m.promo)
             {
                 if (!(killer1[ply].from == m.from && killer1[ply].to == m.to && killer1[ply].promo == m.promo))
@@ -329,7 +453,15 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
             }
             break;
         }
+        ++moveIndex;
     }
+
+    TTFlag flag = TT_EXACT;
+    if (bestScore <= origAlpha)
+        flag = TT_UPPER;
+    else if (bestScore >= beta)
+        flag = TT_LOWER;
+    g_tt.store(key, depth, to_tt_score(bestScore, ply), flag, bestMove);
     return bestScore;
 }
 
@@ -369,4 +501,10 @@ SearchResult search_iterative(Position &P, int maxDepth)
             beta = INF;
     }
     return r;
+}
+
+// allow UCI to clear TT on new game
+extern "C" void tt_clear()
+{
+    g_tt.clear();
 }

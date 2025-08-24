@@ -1,6 +1,7 @@
 #pragma once
 #include "position.hpp"
 #include <vector>
+extern "C" void tt_clear();
 
 struct SearchResult
 {
@@ -11,3 +12,4 @@ struct SearchResult
 
 // Iterative deepening to maxDepth
 SearchResult search_iterative(Position &P, int maxDepth);
+

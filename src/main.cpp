@@ -1,4 +1,6 @@
 #include "attacks.hpp"
+#include "zobrist.hpp"
+
 #include <iostream>
 
 using namespace std;
@@ -11,6 +13,7 @@ int main()
     cin.tie(nullptr);
 
     init_attacks();
+    init_zobrist();
     runUci();
     return 0;
 }
