@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ChatGPT <devnull@example.com>
+Date: Sat, 23 Aug 2025 00:00:00 +0000
+Subject: [patch] san.cpp: remove unused variables needFile/needRank
+
+---
+ src/san.cpp | 16 ++--------------
+ 1 file changed, 2 insertions(+), 14 deletions(-)
+
+diff --git a/src/san.cpp b/src/san.cpp
+index 0000000..0000000 100644
+--- a/src/san.cpp
++++ b/src/san.cpp
+@@ -211,11 +211,7 @@
+     vector<Move> leg;
+     legalMoves(const_cast<Position &>(P), leg);
+-    int needFile = 0, needRank = 0, count = 0;
++    int count = 0;
+     for (auto &x : leg)
+     {
+         if (x.to == m.to && x.promo == m.promo && x.from != m.from)
+         {
+             int tMoving = pieceAt(P, x.from);
+             if (tMoving == moving)
+             {
+                 ++count;
+-                if ((x.from % 8) != (m.from % 8))
+-                    needFile = 1;
+-                else
+-                    needFile = 0;
+-                if ((x.from / 8) != (m.from / 8))
+-                    needRank = 1;
+-                else
+-                    needRank = 0;
+             }
+         }
+     }
+-- 
+2.45.0
