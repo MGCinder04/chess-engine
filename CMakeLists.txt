@@ -27,6 +27,7 @@ add_executable(ChessEngine
   src/san.hpp          # 👈 add
   src/eval.cpp
   src/eval.hpp
+  src/search.cpp
 )
 
 

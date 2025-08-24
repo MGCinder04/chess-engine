@@ -392,6 +392,41 @@ void legalMoves(Position &P, vector<Move> &out)
     }
 }
 
+// position.cpp (ADD)
+void doMove(Position &P, const Move &m, Undo &u)
+{
+    // --- Save pre-move state into Undo (match what you already save in legalMoves) ---
+    u.stm        = P.stm;
+    u.m          = m;
+    u.capPiece   = NO_PIECE; // set below if capture happens
+    u.capSq      = -1;
+    u.prevCastle = P.castle;
+    u.prevEp     = P.epSq;
+
+    // ====== MAKE MOVE  (EXACTLY the same logic you already do inside legalMoves before the "inCheck" test) ======
+    // You already have helpers like pieceAt, place, removeP, etc. Reuse the same code path:
+    // 1) detect moving piece, capture (incl. en-passant), promotions
+    // 2) update rook move for castling (if king moved two squares)
+    // 3) update castle rights (moved king/rook or captured rook)
+    // 4) set/reset ep square on double pawn push
+    // 5) update occupancy, side-to-move flip
+    //
+    // ---- COPY THE SAME BODY YOU USE IN legalMoves(...) FOR THE "make" PART, up to:
+    // P.updateOcc(); P.stm = (P.stm == WHITE ? BLACK : WHITE);
+    //
+    // (No legality test here!)
+    // =================================================================================
+}
+
+void undoMove(Position &P, const Undo &u)
+{
+    // ====== UNMAKE MOVE  (EXACTLY the same logic you already do in legalMoves) ======
+    // COPY the reverse sequence from legalMoves(...) (and perft(...)) that restores:
+    // P.stm, P.castle, P.epSq, moves the piece back, restores captured piece (incl. ep),
+    // reverts rook moves from castling, un-promotes, updates kingSq, then P.updateOcc().
+    // =================================================================================
+}
+
 uint64_t perft(Position &P, int d)
 {
     if (d == 0)

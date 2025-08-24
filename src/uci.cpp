@@ -2,6 +2,7 @@
 #include "eval.hpp"
 #include "fen.hpp"
 #include "position.hpp"
+#include "search.hpp"
 
 #include <cctype>
 #include <iostream>
@@ -134,6 +135,61 @@ static inline void runUciLoop()
         else if (line == "quit")
         {
             break;
+        }
+        // uci.cpp (ADD inside runUciLoop command loop)
+        else if (line.rfind("go", 0) == 0)
+        {
+            int depth = 6;
+            {
+                std::istringstream ss(line);
+                std::string tok;
+                while (ss >> tok)
+                    if (tok == "depth")
+                        ss >> depth;
+            }
+
+            auto res = search_iterative(P, depth);
+
+            auto toUci = [&](const Move &m)
+            {
+                auto sqTo = [&](int s)
+                {
+                    string r;
+                    r.push_back('a' + (s % 8));
+                    r.push_back('1' + (s / 8));
+                    return r;
+                };
+                string s = sqTo(m.from) + sqTo(m.to);
+                if (m.promo)
+                {
+                    char pc = 'q';
+                    if (m.promo == WN || m.promo == BN)
+                        pc = 'n';
+                    else if (m.promo == WB || m.promo == BB)
+                        pc = 'b';
+                    else if (m.promo == WR || m.promo == BR)
+                        pc = 'r';
+                    else
+                        pc = 'q';
+                    s.push_back(pc);
+                }
+                return s;
+            };
+
+            std::ostringstream pvss;
+            for (size_t i = 0; i < res.pv.size(); ++i)
+            {
+                if (i)
+                    pvss << ' ';
+                pvss << toUci(res.pv[i]);
+            }
+
+            cout << "info depth " << depth << " score cp " << res.bestScore << " pv " << pvss.str() << "\n" << flush;
+
+            if (res.pv.empty())
+                cout << "bestmove 0000\n" << flush;
+            else
+                cout << "bestmove " << toUci(res.bestMove) << "\n" << flush;
         }
     }
 }
