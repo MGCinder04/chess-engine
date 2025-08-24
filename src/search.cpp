@@ -5,7 +5,10 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <iostream>
 #include <limits>
 
 using namespace std;
@@ -20,6 +23,10 @@ static TT g_tt(64); // 64 MB
 static constexpr int INF     = 32000;
 static constexpr int MATE    = 30000;
 static constexpr int MAX_PLY = 64;
+
+static std::atomic<bool> g_stop{false};
+static std::atomic<unsigned long long> g_nodes{0};
+static std::chrono::steady_clock::time_point g_t0;
 
 // ---- mate-score encode/decode for TT ----
 static inline int to_tt_score(int sc, int ply)
@@ -245,6 +252,10 @@ static int scoreMove(const Position &P, const Move &m, int ply)
 // --- Quiescence search ---
 static int quiesce(Position &P, int alpha, int beta)
 {
+    if (g_stop.load(std::memory_order_relaxed))
+        return alpha;
+    g_nodes.fetch_add(1, std::memory_order_relaxed);
+
     int standPat = (P.stm == WHITE ? +1 : -1) * evaluate(P);
     if (standPat >= beta)
         return beta;
@@ -329,6 +340,10 @@ static bool givesCheck(Position &P, const Move &m)
 // ===== negamax =====
 static int negamax(Position &P, int depth, int alpha, int beta, int ply)
 {
+    if (g_stop.load(std::memory_order_relaxed))
+        return 0;
+    g_nodes.fetch_add(1, std::memory_order_relaxed);
+
     int origAlpha = alpha;
     pvLen[ply]    = 0;
 
@@ -482,9 +497,13 @@ SearchResult search_iterative(Position &P, int maxDepth)
 
     for (int d = 1; d <= maxDepth; ++d)
     {
+        if (g_stop.load(std::memory_order_relaxed))
+            break;
+
         int score = negamax(P, d, alpha, beta, 0);
 
-        vector<Move> line;
+        // --- capture PV for *this* iteration ---
+        std::vector<Move> line;
         for (int i = 0; i < pvLen[0]; ++i)
             line.push_back(pvTable[0][i]);
         if (!line.empty())
@@ -492,7 +511,47 @@ SearchResult search_iterative(Position &P, int maxDepth)
         r.bestScore = score;
         r.pv        = line;
 
-        // aspiration
+        // --- build PV string from current line ---
+        std::ostringstream pvss;
+        auto sqTo = [&](int s)
+        {
+            std::string r;
+            r.push_back('a' + (s % 8));
+            r.push_back('1' + (s / 8));
+            return r;
+        };
+        for (size_t i = 0; i < r.pv.size(); ++i)
+        {
+            if (i)
+                pvss << ' ';
+            const Move &m = r.pv[i];
+            std::string s = sqTo(m.from) + sqTo(m.to);
+            if (m.promo)
+            {
+                char pc = 'q';
+                if (m.promo == WN || m.promo == BN)
+                    pc = 'n';
+                else if (m.promo == WB || m.promo == BB)
+                    pc = 'b';
+                else if (m.promo == WR || m.promo == BR)
+                    pc = 'r';
+                s.push_back(pc);
+            }
+            pvss << s;
+        }
+
+        // --- time/nodes/nps ---
+        using namespace std::chrono;
+        unsigned long long ms    = (unsigned long long) duration_cast<milliseconds>(steady_clock::now() - g_t0).count();
+        unsigned long long nodes = search_get_nodes();
+        unsigned long long nps   = ms ? (nodes * 1000ull / ms) : 0ull;
+
+        // --- per-iteration info ---
+        cout << "info depth " << d << " score cp " << r.bestScore << " nodes " << nodes << " time " << ms << " nps "
+             << nps << " pv " << pvss.str() << "\n"
+             << flush;
+
+        // aspiration for next iter
         alpha = score - 50;
         beta  = score + 50;
         if (alpha < -INF + 100)
@@ -503,8 +562,34 @@ SearchResult search_iterative(Position &P, int maxDepth)
     return r;
 }
 
-// allow UCI to clear TT on new game
 extern "C" void tt_clear()
 {
     g_tt.clear();
+}
+
+extern "C" void tt_resize_mb(int mb)
+{
+    if (mb < 1)
+        mb = 1;
+    if (mb > 4096)
+        mb = 4096;
+    TT newtt((size_t) mb);
+    g_tt = std::move(newtt);
+}
+
+extern "C" void search_set_stop(int v)
+{
+    g_stop.store(v != 0, std::memory_order_relaxed);
+}
+
+extern "C" void search_set_start_time()
+{
+    g_nodes.store(0, std::memory_order_relaxed);
+    g_stop.store(false, std::memory_order_relaxed);
+    g_t0 = std::chrono::steady_clock::now();
+}
+
+extern "C" unsigned long long search_get_nodes()
+{
+    return g_nodes.load(std::memory_order_relaxed);
 }
