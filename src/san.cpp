@@ -211,26 +211,17 @@ string moveToSAN(Position &P, const Move &m)
         // disambiguation: if multiple same-piece can go to 'to', add file/rank/both
         vector<Move> leg;
         legalMoves(const_cast<Position &>(P), leg);
-        int needFile = 0, needRank = 0, count = 0;
+        int count = 0;
         for (auto &x : leg)
         {
             if (x.to == m.to && x.promo == m.promo && x.from != m.from)
             {
                 int tMoving = pieceAt(P, x.from);
                 if (tMoving == moving)
-                {
                     ++count;
-                    if ((x.from % 8) != (m.from % 8))
-                        needFile = 1;
-                    else
-                        needFile = 0;
-                    if ((x.from / 8) != (m.from / 8))
-                        needRank = 1;
-                    else
-                        needRank = 0;
-                }
             }
         }
+
         if (count > 0)
         {
             // choose minimal disambiguation
