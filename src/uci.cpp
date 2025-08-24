@@ -2,7 +2,8 @@
 #include "eval.hpp"
 #include "fen.hpp"
 #include "position.hpp"
-#include "search.hpp"
+#include "search.hpp"   
+extern void tt_clear(); 
 
 #include <cctype>
 #include <iostream>
@@ -28,6 +29,13 @@ static inline void runUciLoop()
         {
             cout << "readyok\n" << flush;
         }
+        else if (line == "ucinewgame")
+        {
+            tt_clear(); // clear TT between games
+            P.setStart();
+            cout << "info string new game\n" << flush;
+        }
+
         else if (line.rfind("position", 0) == 0)
         {
 

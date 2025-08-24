@@ -46,5 +46,11 @@
   "command": "C:\\msys64\\ucrt64\\bin\\c++.exe -g -std=gnu++20 -Wall -Wextra -Wpedantic -o CMakeFiles\\ChessEngine.dir\\src\\search.cpp.obj -c C:\\projects\\chess-engine\\src\\search.cpp",
   "file": "C:/projects/chess-engine/src/search.cpp",
   "output": "C:/projects/chess-engine/build/CMakeFiles/ChessEngine.dir/src/search.cpp.obj"
+},
+{
+  "directory": "C:/projects/chess-engine/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\c++.exe -g -std=gnu++20 -Wall -Wextra -Wpedantic -o CMakeFiles\\ChessEngine.dir\\src\\zobrist.cpp.obj -c C:\\projects\\chess-engine\\src\\zobrist.cpp",
+  "file": "C:/projects/chess-engine/src/zobrist.cpp",
+  "output": "C:/projects/chess-engine/build/CMakeFiles/ChessEngine.dir/src/zobrist.cpp.obj"
 }
 ]

@@ -28,6 +28,7 @@ add_executable(ChessEngine
   src/eval.cpp
   src/eval.hpp
   src/search.cpp
+  src/zobrist.cpp
 )
 
 
