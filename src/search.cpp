@@ -430,10 +430,10 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
             bestScore = sc;
             bestMove  = m;
 
-            pvTable[ply][ply] = m;
+            pvTable[ply][0] = m;
             for (int i = 0; i < pvLen[ply + 1]; ++i)
-                pvTable[ply][ply + 1 + i] = pvTable[ply + 1][ply + 1 + i];
-            pvLen[ply] = 1 + pvLen[ply + 1];
+                pvTable[ply][i + 1] = pvTable[ply + 1][i];
+            pvLen[ply] = pvLen[ply + 1] + 1;
         }
 
         if (bestScore > alpha)
