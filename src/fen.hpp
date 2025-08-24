@@ -3,15 +3,15 @@
 #include <string>
 #include <vector>
 
-// FEN loader: sets pieces, side-to-move, castling, ep square
-bool setFromFEN(Position &P, const std::string &fen);
+using namespace std;
 
-// Apply a single UCI move ("e2e4", "a7a8q") if it's legal
-bool applyUCIMove(Position &P, const std::string &uci);
+bool setFromFEN(Position &P, const string &fen);
 
-// Apply a list of UCI moves (returns false if any is illegal)
-bool applyUCIMoves(Position &P, const std::vector<std::string> &ms);
+bool parseMove(const Position &P, const string &uci, Move &out);
+string moveToUCI(const Move &m);
 
-// NEW: tiny UCI helpers
-bool parseMove(const Position &P, const std::string &uci, Move &out); // "e2e4", "a7a8q"
-std::string moveToUCI(const Move &m);
+bool applyUCIMove(Position &P, const string &uci);
+bool applyUCIMoves(Position &P, const vector<string> &ms);
+
+bool applyUserMove(Position &P, const string &token);
+bool applyUserMoves(Position &P, const vector<string> &tokens);

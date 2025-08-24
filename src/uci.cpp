@@ -1,5 +1,6 @@
 #include "attacks.hpp"
-#include "fen.hpp" // 👈 new
+#include "eval.hpp"
+#include "fen.hpp"
 #include "position.hpp"
 
 #include <cctype>
@@ -8,111 +9,131 @@
 #include <string>
 #include <vector>
 
+using namespace std;
+
 static inline void runUciLoop()
 {
     Position P;
     P.setStart();
 
-    std::string line;
-    while (std::getline(std::cin, line))
+    string line;
+    while (getline(cin, line))
     {
         if (line == "uci")
         {
-            std::cout << "id name ChessEngine\nid author You\nuciok\n" << std::flush;
+            cout << "id name ChessEngine\nid author You\nuciok\n" << flush;
         }
         else if (line == "isready")
         {
-            std::cout << "readyok\n" << std::flush;
+            cout << "readyok\n" << flush;
         }
         else if (line.rfind("position", 0) == 0)
         {
-            auto trim = [](std::string s)
+
+            auto trim = [](string s)
             {
-                while (!s.empty() && std::isspace((unsigned char) s.front()))
+                while (!s.empty() && isspace((unsigned char) s.front()))
                     s.erase(s.begin());
-                while (!s.empty() && std::isspace((unsigned char) s.back()))
+                while (!s.empty() && isspace((unsigned char) s.back()))
                     s.pop_back();
                 return s;
             };
 
-            if (line.find("startpos") != std::string::npos)
+            // helper: apply tokens one-by-one and report the first failure
+            auto apply_tokens = [&](vector<string> &ms)
+            {
+                for (size_t i = 0; i < ms.size(); ++i)
+                {
+                    if (!applyUserMove(P, ms[i]))
+                    {
+                        cout << "info string illegal move in sequence at token #" << (i + 1) << " = \"" << ms[i]
+                                  << "\"\n"
+                                  << flush;
+                        return false;
+                    }
+                }
+                return true;
+            };
+
+            if (line.find("startpos") != string::npos)
             {
                 P.setStart();
+
                 // optional moves after startpos
                 size_t mpos = line.find(" moves ");
-                if (mpos != std::string::npos)
+                if (mpos != string::npos)
                 {
-                    std::string rest = line.substr(mpos + 7);
-                    std::istringstream iss(rest);
-                    std::vector<std::string> ms;
-                    std::string tok;
+                    string rest = line.substr(mpos + 7);
+                    istringstream iss(rest);
+                    vector<string> ms;
+                    string tok;
                     while (iss >> tok)
                         ms.push_back(tok);
-                    if (!applyUCIMoves(P, ms))
-                    {
-                        std::cout << "info string illegal move in sequence\n" << std::flush;
-                    }
+                    (void) apply_tokens(ms); // apply & report if anything fails
                 }
             }
             else
             {
                 // "position fen <FEN> [moves ...]"
-                const std::string key = "position fen ";
+                const string key = "position fen ";
                 size_t pos            = line.find(key);
-                if (pos == std::string::npos)
+                if (pos == string::npos)
                 {
-                    std::cout << "info string unsupported position command\n" << std::flush;
+                    cout << "info string unsupported position command\n" << flush;
                 }
                 else
                 {
                     size_t fenStart = pos + key.size();
                     size_t mpos     = line.find(" moves ", fenStart);
-                    std::string fen = (mpos == std::string::npos) ? trim(line.substr(fenStart))
+                    string fen = (mpos == string::npos) ? trim(line.substr(fenStart))
                                                                   : trim(line.substr(fenStart, mpos - fenStart));
-
                     if (!setFromFEN(P, fen))
                     {
-                        std::cout << "info string fen parse error\n" << std::flush;
+                        cout << "info string fen parse error\n" << flush;
                     }
-                    else if (mpos != std::string::npos)
+                    else if (mpos != string::npos)
                     {
-                        std::string rest = line.substr(mpos + 7);
-                        std::istringstream iss(rest);
-                        std::vector<std::string> ms;
-                        std::string tok;
+                        string rest = line.substr(mpos + 7);
+                        istringstream iss(rest);
+                        vector<string> ms;
+                        string tok;
                         while (iss >> tok)
                             ms.push_back(tok);
-                        if (!applyUCIMoves(P, ms))
-                        {
-                            std::cout << "info string illegal move in sequence\n" << std::flush;
-                        }
+                        (void) apply_tokens(ms); // apply & report if anything fails
                     }
                 }
             }
         }
         else if (line.rfind("go perft ", 0) == 0)
         {
-            int d = std::stoi(line.substr(9));
-            std::cout << perft(P, d) << "\n" << std::flush;
+            int d = stoi(line.substr(9));
+            cout << perft(P, d) << "\n" << flush;
         }
         else if (line.rfind("perftsplit ", 0) == 0)
         {
-            int d = std::stoi(line.substr(11));
+            int d = stoi(line.substr(11));
             perftSplit(P, d);
+        }
+        else if (line == "eval")
+        {
+            int cp     = evaluate(P);
+            int stm_cp = (P.stm == WHITE ? cp : -cp);
+            cout << "info string eval " << cp << " cp (white POV), " << stm_cp << " cp (side-to-move POV)\n"
+                      << flush;
+        }
+        // optional tiny tester for parseMove/moveToUCI
+        else if (line.rfind("echo ", 0) == 0)
+        {
+            string mv = line.substr(5);
+            Move m{};
+            if (parseMove(P, mv, m))
+                cout << "ok " << moveToUCI(m) << "\n" << flush;
+            else
+                cout << "bad move\n" << flush;
         }
         else if (line == "quit")
         {
             break;
-        }
-        // (You can temporarily add this in uci.cpp to test formatting)
-        else if (line.rfind("echo ", 0) == 0)
-        {
-            std::string mv = line.substr(5);
-            Move m{};
-            if (parseMove(P, mv, m))
-                std::cout << "ok " << moveToUCI(m) << "\n";
-            else
-                std::cout << "bad move\n";
         }
     }
 }

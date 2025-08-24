@@ -1,13 +1,14 @@
 #include "attacks.hpp"
 #include <iostream>
 
-// Defined in uci.cpp
+using namespace std;
+
 void runUci();
 
 int main()
 {
-    std::ios::sync_with_stdio(false);
-    std::cin.tie(nullptr);
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
 
     init_attacks();
     runUci();
