@@ -229,13 +229,56 @@ static void orderMoves(Position &P, vector<Move> &mv, int ply)
          [&](const Move &a, const Move &b) { return scoreMove(P, a, ply) > scoreMove(P, b, ply); });
 }
 
+// --- Quiescence search: extend leaf nodes with captures ---
+static int quiesce(Position &P, int alpha, int beta)
+{
+    int standPat = (P.stm == WHITE ? +1 : -1) * evaluate(P);
+    if (standPat >= beta)
+        return beta;
+    if (standPat > alpha)
+        alpha = standPat;
+
+    vector<Move> moves;
+    legalMoves(P, moves);
+
+    // Only consider captures
+    moves.erase(remove_if(moves.begin(), moves.end(),
+                          [&](const Move &m)
+                          {
+                              return pieceAt(P, m.to) == NO_PIECE && m.promo == 0; // keep captures/promos
+                          }),
+                moves.end());
+
+    // Order captures (MVV/LVA)
+    sort(moves.begin(), moves.end(),
+         [&](const Move &a, const Move &b)
+         {
+             return mvvLvaScore(pieceAt(P, a.from), pieceAt(P, a.to)) >
+                    mvvLvaScore(pieceAt(P, b.from), pieceAt(P, b.to));
+         });
+
+    for (const Move &m : moves)
+    {
+        UndoLocal u{};
+        doMoveLocal(P, m, u);
+        int score = -quiesce(P, -beta, -alpha);
+        undoMoveLocal(P, u);
+
+        if (score >= beta)
+            return beta;
+        if (score > alpha)
+            alpha = score;
+    }
+    return alpha;
+}
+
 // ===== negamax =====
 static int negamax(Position &P, int depth, int alpha, int beta, int ply)
 {
     pvLen[ply] = 0;
 
     if (depth == 0)
-        return (P.stm == WHITE ? +1 : -1) * evaluate(P);
+        return quiesce(P, alpha, beta);
 
     vector<Move> mv;
     legalMoves(P, mv);
