@@ -24,6 +24,9 @@ static inline void runUciLoop()
         if (line == "uci")
         {
             cout << "id name ChessEngine\nid author You\nuciok\n" << flush;
+            cout << "option name Hash type spin default 64 min 1 max 4096\n" << flush;
+            cout << "option name Threads type spin default 1 min 1 max 32\n" << flush;
+            cout << "option name Move Overhead type spin default 30 min 0 max 1000\n" << flush;
         }
         else if (line == "isready")
         {
@@ -156,6 +159,9 @@ static inline void runUciLoop()
                         ss >> depth;
             }
 
+            search_set_start_time();
+            search_set_stop(0);
+
             auto res = search_iterative(P, depth);
 
             auto toUci = [&](const Move &m)
@@ -177,27 +183,98 @@ static inline void runUciLoop()
                         pc = 'b';
                     else if (m.promo == WR || m.promo == BR)
                         pc = 'r';
-                    else
-                        pc = 'q';
                     s.push_back(pc);
                 }
                 return s;
             };
 
-            std::ostringstream pvss;
-            for (size_t i = 0; i < res.pv.size(); ++i)
+            if (res.pv.empty())
             {
-                if (i)
-                    pvss << ' ';
-                pvss << toUci(res.pv[i]);
+                cout << "bestmove 0000\n" << flush;
+            }
+            else
+            {
+                cout << "bestmove " << toUci(res.bestMove) << "\n" << flush;
+            }
+        }
+
+        else if (line.rfind("setoption", 0) == 0)
+        {
+            // parse: setoption name XXX value YYY
+            std::string name, value;
+            std::istringstream ss(line);
+            std::string tok;
+            ss >> tok; // setoption
+            while (ss >> tok)
+            {
+                if (tok == "name")
+                {
+                    name.clear();
+                    // read until "value" or end
+                    while (ss >> tok && tok != "value")
+                    {
+                        if (!name.empty())
+                            name += ' ';
+                        name += tok;
+                    }
+                    if (tok == "value")
+                    {
+                        std::getline(ss, value);
+                        if (!value.empty() && value[0] == ' ')
+                            value.erase(0, 1);
+                    }
+                    break;
+                }
             }
 
-            cout << "info depth " << depth << " score cp " << res.bestScore << " pv " << pvss.str() << "\n" << flush;
-
-            if (res.pv.empty())
-                cout << "bestmove 0000\n" << flush;
+            if (name == "Hash")
+            {
+                int mb = 64;
+                try
+                {
+                    mb = std::stoi(value);
+                }
+                catch (...)
+                {
+                }
+                tt_resize_mb(mb);
+                tt_clear();
+                cout << "info string Hash set to " << mb << " MB\n" << flush;
+            }
+            else if (name == "Threads")
+            {
+                // stored but unused (engine is single-threaded now)
+                int thr = 1;
+                try
+                {
+                    thr = std::stoi(value);
+                }
+                catch (...)
+                {
+                }
+                cout << "info string Threads set to " << thr << " (single-threaded)\n" << flush;
+            }
+            else if (name == "Move Overhead")
+            {
+                int mo = 30;
+                try
+                {
+                    mo = std::stoi(value);
+                }
+                catch (...)
+                {
+                }
+                cout << "info string Move Overhead set to " << mo << " ms\n" << flush;
+            }
             else
-                cout << "bestmove " << toUci(res.bestMove) << "\n" << flush;
+            {
+                cout << "info string unknown option '" << name << "'\n" << flush;
+            }
+        }
+        else if (line == "stop")
+        {
+            search_set_stop(1);
+            cout << "info string stop requested\n" << flush;
         }
     }
 }
