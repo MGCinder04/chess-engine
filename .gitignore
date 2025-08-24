@@ -1,1 +1,43 @@
-.vscode
+# --- Build artifacts ---
+/build/
+/CMakeFiles/
+/CMakeCache.txt
+/build.ninja
+/.ninja_log
+/.ninja_deps
+/compile_commands.json
+
+# --- Binaries ---
+*.exe
+*.dll
+*.lib
+*.a
+*.so
+*.dylib
+*.obj
+*.o
+*.pdb
+
+# --- Engine test binaries (not source) ---
+/test engine/
+/cutechess.exe
+/lc0.exe
+/stockfish-*.exe
+
+# --- Editor/IDE files ---
+.vscode/
+*.user
+*.swp
+*.swo
+
+# --- OS-specific ---
+.DS_Store
+Thumbs.db
+
+# --- Logs and temp ---
+*.log
+*.tmp
+
+# ignore all exes except ChessEngine.exe
+!build/ChessEngine.exe
+!src/main.exe    # (if you also want this tiny test exe tracked)
