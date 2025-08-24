@@ -13,6 +13,8 @@ extern void tt_clear();
 
 using namespace std;
 
+static int g_moveOverheadMs = 30; // default
+
 static inline void runUciLoop()
 {
     Position P;
@@ -150,30 +152,73 @@ static inline void runUciLoop()
         // uci.cpp (ADD inside runUciLoop command loop)
         else if (line.rfind("go", 0) == 0)
         {
-            int depth = 6;
+            int depth          = -1; // -1 = unlimited (we’ll cap by time)
+            long long movetime = -1; // in ms; -1 = none
+
             {
                 std::istringstream ss(line);
                 std::string tok;
                 while (ss >> tok)
+                {
                     if (tok == "depth")
                         ss >> depth;
+                    else if (tok == "movetime")
+                        ss >> movetime;
+                }
             }
 
+            // Start timers/counters
             search_set_start_time();
-            search_set_stop(0);
 
-            auto res = search_iterative(P, depth);
+            // Set a time limit if movetime provided
+            if (movetime > 0)
+            {
+                long long budget = movetime - g_moveOverheadMs;
+                if (budget < 1)
+                    budget = 1;
+                search_set_time_limit_ms((unsigned long long) budget);
+            }
+            else
+            {
+                search_set_time_limit_ms(0); // no limit
+            }
+
+            // choose depth to call (fallback if only movetime is set)
+            int callDepth = (depth > 0 ? depth : 99); // large depth; time will stop the search
+
+            auto res = search_iterative(P, callDepth);
+
+            // Fallbacks so we never output 0000
+            if (res.pv.empty())
+            {
+                Move m{};
+                if (search_root_tt_move(P, &m))
+                {
+                    res.bestMove = m;
+                    res.pv       = {m};
+                }
+                else
+                {
+                    std::vector<Move> mv;
+                    legalMoves(P, mv);
+                    if (!mv.empty())
+                    {
+                        res.bestMove = mv[0];
+                        res.pv       = {mv[0]};
+                    }
+                }
+            }
 
             auto toUci = [&](const Move &m)
             {
                 auto sqTo = [&](int s)
                 {
-                    string r;
+                    std::string r;
                     r.push_back('a' + (s % 8));
                     r.push_back('1' + (s / 8));
                     return r;
                 };
-                string s = sqTo(m.from) + sqTo(m.to);
+                std::string s = sqTo(m.from) + sqTo(m.to);
                 if (m.promo)
                 {
                     char pc = 'q';

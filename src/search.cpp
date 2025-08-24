@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <sstream>
 
 using namespace std;
 
@@ -27,6 +28,7 @@ static constexpr int MAX_PLY = 64;
 static std::atomic<bool> g_stop{false};
 static std::atomic<unsigned long long> g_nodes{0};
 static std::chrono::steady_clock::time_point g_t0;
+static std::atomic<unsigned long long> g_timeLimitMs{0};
 
 // ---- mate-score encode/decode for TT ----
 static inline int to_tt_score(int sc, int ply)
@@ -255,6 +257,17 @@ static int quiesce(Position &P, int alpha, int beta)
     if (g_stop.load(std::memory_order_relaxed))
         return alpha;
     g_nodes.fetch_add(1, std::memory_order_relaxed);
+    if (g_timeLimitMs.load(std::memory_order_relaxed))
+    {
+        using namespace std::chrono;
+        unsigned long long elapsed =
+            (unsigned long long) duration_cast<milliseconds>(steady_clock::now() - g_t0).count();
+        if (elapsed >= g_timeLimitMs.load(std::memory_order_relaxed))
+        {
+            g_stop.store(true, std::memory_order_relaxed);
+            return alpha;
+        }
+    }
 
     int standPat = (P.stm == WHITE ? +1 : -1) * evaluate(P);
     if (standPat >= beta)
@@ -343,6 +356,17 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
     if (g_stop.load(std::memory_order_relaxed))
         return 0;
     g_nodes.fetch_add(1, std::memory_order_relaxed);
+    if (g_timeLimitMs.load(std::memory_order_relaxed))
+    {
+        using namespace std::chrono;
+        unsigned long long elapsed =
+            (unsigned long long) duration_cast<milliseconds>(steady_clock::now() - g_t0).count();
+        if (elapsed >= g_timeLimitMs.load(std::memory_order_relaxed))
+        {
+            g_stop.store(true, std::memory_order_relaxed);
+            return 0; // return whatever—ID will keep previous best move
+        }
+    }
 
     int origAlpha = alpha;
     pvLen[ply]    = 0;
@@ -356,7 +380,15 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
         if (e->depth >= depth)
         {
             if (e->flag == TT_EXACT)
+            {
+                // Seed PV at root so GUI always shows a move on TT hit
+                if (ply == 0 && (e->move.from | e->move.to))
+                {
+                    pvLen[0]      = 1;
+                    pvTable[0][0] = e->move;
+                }
                 return ttScore;
+            }
             else if (e->flag == TT_LOWER && ttScore > alpha)
                 alpha = ttScore;
             else if (e->flag == TT_UPPER && ttScore < beta)
@@ -582,6 +614,11 @@ extern "C" void search_set_stop(int v)
     g_stop.store(v != 0, std::memory_order_relaxed);
 }
 
+extern "C" void search_set_time_limit_ms(unsigned long long ms)
+{
+    g_timeLimitMs.store(ms, std::memory_order_relaxed);
+}
+
 extern "C" void search_set_start_time()
 {
     g_nodes.store(0, std::memory_order_relaxed);
@@ -592,4 +629,17 @@ extern "C" void search_set_start_time()
 extern "C" unsigned long long search_get_nodes()
 {
     return g_nodes.load(std::memory_order_relaxed);
+}
+
+extern "C" int search_root_tt_move(Position &P, Move *out)
+{
+    uint64_t key = compute_zobrist(P);
+    TTEntry *e   = g_tt.probe(key);
+    if (e->key == key && (e->move.from | e->move.to))
+    {
+        if (out)
+            *out = e->move;
+        return 1;
+    }
+    return 0;
 }
