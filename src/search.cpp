@@ -282,6 +282,12 @@ static int quiesce(Position &P, int alpha, int beta)
 
     for (const Move &m : moves)
     {
+        int captured    = pieceAt(P, m.to);
+        int gainBound   = standPat + piece_value[captured] + 100; // small margin
+        const int Delta = 900;                                    // queen value margin
+        if (gainBound + Delta < alpha)
+            continue; // skip hopeless capture
+
         UndoLocal u{};
         doMoveLocal(P, m, u);
         int score = -quiesce(P, -beta, -alpha);
@@ -292,6 +298,7 @@ static int quiesce(Position &P, int alpha, int beta)
         if (score > alpha)
             alpha = score;
     }
+
     return alpha;
 }
 
@@ -331,14 +338,7 @@ static inline bool isCapture(const Position &P, const Move &m)
             return true;
     return false;
 }
-static bool givesCheck(Position &P, const Move &m)
-{
-    UndoLocal u{};
-    doMoveLocal(P, m, u);
-    bool chk = sqAttacked(P, P.kingSq[P.stm], (P.stm == WHITE ? BLACK : WHITE));
-    undoMoveLocal(P, u);
-    return chk;
-}
+
 
 static int negamax(Position &P, int depth, int alpha, int beta, int ply)
 {
@@ -426,28 +426,43 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
     {
         int d = depth - 1;
 
-        bool cap      = isCapture(P, m);
-        bool chk      = false;
+        // --- LMR decision (late quiets only) ---
+        bool cap      = (pieceAt(P, m.to) != NO_PIECE) || m.promo;
         int reduction = 0;
         if (depth >= 3 && moveIndex >= 3 && !cap)
         {
-            chk = givesCheck(P, m);
-            if (!chk)
-                reduction = 1 + (moveIndex > 8);
+            // Tentatively plan a 1–2 ply reduction for late quiets
+            reduction = 1 + (moveIndex > 8);
         }
 
         UndoLocal u{};
         doMoveLocal(P, m, u);
 
-        int sc = -negamax(P, d - reduction, -alpha, -alpha - 1, ply + 1); 
-        if (reduction && sc > alpha)
+        // If the move actually gives check, don't reduce it.
+        if (reduction)
         {
-            sc = -negamax(P, d, -beta, -alpha, ply + 1); 
+            bool givesChk = sqAttacked(P, P.kingSq[P.stm == WHITE ? BLACK : WHITE], (P.stm == WHITE ? BLACK : WHITE));
+            if (givesChk)
+                reduction = 0;
         }
-        else if (!reduction)
+
+        int sc;
+
+        // --- Reduced null-window probe for reduced moves ---
+        if (reduction)
         {
+            sc = -negamax(P, d - reduction, -alpha - 1, -alpha, ply + 1);
+            // If promising, re-search at the proper depth/window
+            if (sc > alpha)
+                sc = -negamax(P, d, -beta, -alpha, ply + 1);
+        }
+        else
+        {
+            // PVS: full window for the first move; null-window for later moves
             if (moveIndex == 0)
-                sc = -negamax(P, d, -beta, -alpha, ply + 1); 
+            {
+                sc = -negamax(P, d, -beta, -alpha, ply + 1);
+            }
             else
             {
                 sc = -negamax(P, d, -alpha - 1, -alpha, ply + 1);
@@ -471,6 +486,7 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
 
         if (bestScore > alpha)
             alpha = bestScore;
+
         if (alpha >= beta)
         {
             if (!m.promo)
@@ -486,6 +502,7 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
             }
             break;
         }
+
         ++moveIndex;
     }
 
@@ -494,6 +511,7 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
         flag = TT_UPPER;
     else if (bestScore >= beta)
         flag = TT_LOWER;
+
     g_tt.store(key, depth, to_tt_score(bestScore, ply), flag, bestMove);
     return bestScore;
 }
@@ -510,15 +528,41 @@ SearchResult search_iterative(Position &P, int maxDepth)
         pvLen[i] = 0;
 
     SearchResult r;
-    int alpha = -INF, beta = +INF;
+    int prevScore = 0;
 
     for (int d = 1; d <= maxDepth; ++d)
     {
         if (g_stop.load(std::memory_order_relaxed))
             break;
 
-        int score = negamax(P, d, alpha, beta, 0);
+        int score;
+        if (d == 1)
+        {
+            // First iteration: full window to seed prevScore
+            score = negamax(P, d, -INF, +INF, 0);
+        }
+        else
+        {
+            int alpha = prevScore - 50;
+            int beta  = prevScore + 50;
 
+            // Re-search on fail-low/high, widening the window
+            while (true)
+            {
+                if (g_stop.load(std::memory_order_relaxed))
+                    break;
+                score = negamax(P, d, alpha, beta, 0);
+
+                if (score <= alpha)
+                    alpha -= 200; // widen low
+                else if (score >= beta)
+                    beta += 200; // widen high
+                else
+                    break; // inside window
+            }
+        }
+
+        // Extract PV
         std::vector<Move> line;
         for (int i = 0; i < pvLen[0]; ++i)
             line.push_back(pvTable[0][i]);
@@ -527,6 +571,7 @@ SearchResult search_iterative(Position &P, int maxDepth)
         r.bestScore = score;
         r.pv        = line;
 
+        // UCI "info" line
         std::ostringstream pvss;
         auto sqTo = [&](int s)
         {
@@ -564,13 +609,9 @@ SearchResult search_iterative(Position &P, int maxDepth)
              << nps << " pv " << pvss.str() << "\n"
              << flush;
 
-        alpha = score - 50;
-        beta  = score + 50;
-        if (alpha < -INF + 100)
-            alpha = -INF;
-        if (beta > INF - 100)
-            beta = INF;
+        prevScore = score; // seed next iteration’s window
     }
+
     return r;
 }
 
