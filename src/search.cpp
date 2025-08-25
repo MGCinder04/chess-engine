@@ -86,6 +86,10 @@ struct UndoLocal
     int movedPiece{NO_PIECE};
 };
 
+// ================================================
+// FIXED doMoveLocal / undoMoveLocal
+// ================================================
+
 static void doMoveLocal(Position &P, const Move &m, UndoLocal &u)
 {
     u.stm        = P.stm;
@@ -101,6 +105,7 @@ static void doMoveLocal(Position &P, const Move &m, UndoLocal &u)
     bool isPawn  = (moving == WP || moving == BP);
     bool isEP    = isPawn && (m.to == P.epSq) && (cap == NO_PIECE);
 
+    // Handle captures
     if (isEP)
     {
         int ts     = (P.stm == WHITE ? m.to - 8 : m.to + 8);
@@ -115,10 +120,12 @@ static void doMoveLocal(Position &P, const Move &m, UndoLocal &u)
         removeP(P, cap, m.to);
     }
 
+    // Move the piece (handle promotions)
     removeP(P, moving, m.from);
-    int placeAs = m.promo ? m.promo : moving;
+    int placeAs = (m.promo ? m.promo : moving);
     place(P, placeAs, m.to);
 
+    // Castling rook moves
     if (moving == WK && abs(m.to - m.from) == 2)
     {
         if (m.to == G1)
@@ -146,6 +153,7 @@ static void doMoveLocal(Position &P, const Move &m, UndoLocal &u)
         }
     }
 
+    // Update castling rights
     auto clearCastleOnRookSq = [&](int sq)
     {
         if (sq == H1)
@@ -166,22 +174,26 @@ static void doMoveLocal(Position &P, const Move &m, UndoLocal &u)
     if (u.capPiece != NO_PIECE && u.capSq != -1)
         clearCastleOnRookSq(u.capSq);
 
-    
+    // Update en-passant
     P.epSq = -1;
     if (isPawn && abs((int) m.to - (int) m.from) == 16)
         P.epSq = (P.stm == WHITE ? (m.from + 8) : (m.from - 8));
 
+    // Switch turn
     P.stm = (P.stm == WHITE ? BLACK : WHITE);
     P.updateOcc();
 }
 
 static void undoMoveLocal(Position &P, const UndoLocal &u)
 {
+    // Restore turn / ep / castling
     P.stm    = u.stm;
     P.epSq   = u.prevEp;
     P.castle = u.prevCastle;
 
     int moved = u.movedPiece;
+
+    // Undo castling rook moves
     if (moved == WK && abs(u.m.to - u.m.from) == 2)
     {
         if (u.m.to == G1)
@@ -209,10 +221,18 @@ static void undoMoveLocal(Position &P, const UndoLocal &u)
         }
     }
 
-    removeP(P, moved, u.m.to);
-    int orig = u.m.promo ? (u.stm == WHITE ? WP : BP) : moved;
+    // Remove piece from destination
+    removeP(P, pieceAt(P, u.m.to), u.m.to);
+
+    // Restore moving piece (handle promotions)
+    int orig;
+    if (u.m.promo)
+        orig = (u.stm == WHITE ? WP : BP); // restore to pawn
+    else
+        orig = moved;
     place(P, orig, u.m.from);
 
+    // Restore captured piece if any
     if (u.capPiece != NO_PIECE && u.capSq != -1)
         place(P, u.capPiece, u.capSq);
 

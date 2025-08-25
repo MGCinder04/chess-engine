@@ -81,7 +81,18 @@ static inline void runUciLoop()
                     string tok;
                     while (iss >> tok)
                         ms.push_back(tok);
-                    (void) apply_tokens(ms); 
+                    (void) apply_tokens(ms);
+
+                    // === SIMPLE CHECK: make sure side-to-move is correct after 'position' ===
+                    {
+                        int ply       = (int) ms.size();
+                        Side expected = (ply % 2 == 0 ? WHITE : BLACK);
+                        if (P.stm != expected)
+                        {
+                            cout << "info string DEBUG: stm mismatch after position; fixing\n" << flush;
+                            P.stm = expected; // force-correct it
+                        }
+                    }
                 }
             }
             else
@@ -110,7 +121,18 @@ static inline void runUciLoop()
                         string tok;
                         while (iss >> tok)
                             ms.push_back(tok);
-                        (void) apply_tokens(ms); 
+                        (void) apply_tokens(ms);
+
+                        // === SIMPLE CHECK: make sure side-to-move is correct after 'position' ===
+                        {
+                            int ply       = (int) ms.size();
+                            Side expected = (ply % 2 == 0 ? WHITE : BLACK);
+                            if (P.stm != expected)
+                            {
+                                cout << "info string DEBUG: stm mismatch after position; fixing\n" << flush;
+                                P.stm = expected; // force-correct it
+                            }
+                        }
                     }
                 }
             }
@@ -147,9 +169,10 @@ static inline void runUciLoop()
         }
         else if (line.rfind("go", 0) == 0)
         {
-            int depth          = -1; 
-            long long movetime = -1; 
+            int depth          = -1;
+            long long movetime = -1;
 
+            // Parse: "go depth N" / "go movetime M"
             {
                 std::istringstream ss(line);
                 std::string tok;
@@ -161,7 +184,7 @@ static inline void runUciLoop()
                         ss >> movetime;
                 }
             }
-            
+
             search_set_start_time();
 
             if (movetime > 0)
@@ -173,33 +196,69 @@ static inline void runUciLoop()
             }
             else
             {
-                search_set_time_limit_ms(0); 
+                search_set_time_limit_ms(0); // no hard limit
             }
 
-            int callDepth = (depth > 0 ? depth : 99); 
+            int callDepth = (depth > 0 ? depth : 99);
 
+            // Run search
             auto res = search_iterative(P, callDepth);
 
-            if (res.pv.empty())
+            // Collect current legal moves at root (from current P.stm)
+            std::vector<Move> rootMoves;
+            legalMoves(P, rootMoves);
+
+            if (rootMoves.empty())
             {
-                Move m{};
-                if (search_root_tt_move(P, &m))
-                {
-                    res.bestMove = m;
-                    res.pv       = {m};
-                }
-                else
-                {
-                    std::vector<Move> mv;
-                    legalMoves(P, mv);
-                    if (!mv.empty())
-                    {
-                        res.bestMove = mv[0];
-                        res.pv       = {mv[0]};
-                    }
-                }
+                cout << "info string DEBUG: no legal moves generated, but game not over?\n" << flush;
             }
 
+            auto sameMove = [](const Move &a, const Move &b)
+            { return a.from == b.from && a.to == b.to && a.promo == b.promo; };
+
+            // Helper: ensure move is legal; otherwise use TT move; otherwise first legal; otherwise 0000
+            auto ensure_legal_best = [&](Move m) -> Move
+            {
+                for (auto &lm : rootMoves)
+                    if (sameMove(lm, m))
+                        return m; // ok
+                // Try TT move
+                Move tt{};
+                if (search_root_tt_move(P, &tt))
+                    for (auto &lm : rootMoves)
+                        if (sameMove(lm, tt))
+                            return tt;
+                // Fallback to first legal
+                if (!rootMoves.empty())
+                {
+                    cout << "info string filtered illegal bestmove; using first legal\n" << flush;
+                    return rootMoves[0];
+                }
+                // No legal moves (checkmate/stalemate)
+                return Move{0, 0, 0};
+            };
+
+            // Prefer search result; fix it if needed
+            res.bestMove = ensure_legal_best(res.bestMove);
+
+            // If search returned no PV, build a minimal one so GUIs are happy
+            if (res.pv.empty() && (res.bestMove.from | res.bestMove.to))
+                res.pv = {res.bestMove};
+
+#ifndef NDEBUG
+            // Debug note if still not legal (shouldn't happen)
+            bool found = false;
+            for (auto &m : rootMoves)
+                if (sameMove(m, res.bestMove))
+                {
+                    found = true;
+                    break;
+                }
+            if (!found && (res.bestMove.from | res.bestMove.to))
+                cout << "info string DEBUG: bestmove not in legal set after filtering\n" << flush;
+#endif
+
+            // Print result
             auto toUci = [&](const Move &m)
             {
                 auto sqTo = [&](int s)
@@ -224,14 +283,10 @@ static inline void runUciLoop()
                 return s;
             };
 
-            if (res.pv.empty())
-            {
-                cout << "bestmove 0000\n" << flush;
-            }
+            if ((res.bestMove.from | res.bestMove.to) == 0)
+                cout << "bestmove 0000\n" << flush; // no legal moves
             else
-            {
                 cout << "bestmove " << toUci(res.bestMove) << "\n" << flush;
-            }
         }
 
         else if (line.rfind("setoption", 0) == 0)
