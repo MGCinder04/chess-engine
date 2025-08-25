@@ -14,13 +14,10 @@
 
 using namespace std;
 
-// ---- forward decl for functions that call negamax ----
 static int negamax(Position &P, int depth, int alpha, int beta, int ply);
 
-// ---- TT instance ----
-static TT g_tt(64); // 64 MB
+static TT g_tt(64); 
 
-// ---- constants ----
 static constexpr int INF     = 32000;
 static constexpr int MATE    = 30000;
 static constexpr int MAX_PLY = 64;
@@ -30,7 +27,6 @@ static std::atomic<unsigned long long> g_nodes{0};
 static std::chrono::steady_clock::time_point g_t0;
 static std::atomic<unsigned long long> g_timeLimitMs{0};
 
-// ---- mate-score encode/decode for TT ----
 static inline int to_tt_score(int sc, int ply)
 {
     if (sc > MATE - 1000)
@@ -48,7 +44,6 @@ static inline int from_tt_score(int sc, int ply)
     return sc;
 }
 
-// ===== helpers =====
 static inline int pieceAt(const Position &P, int s)
 {
     U64 m = sqbb((unsigned) s);
@@ -66,15 +61,12 @@ static inline void place(Position &P, int p, int s)
     P.bb12[p] |= sqbb((unsigned) s);
 }
 
-// ===== killers & history =====
 static array<Move, MAX_PLY> killer1, killer2;
 static uint32_t historyTable[12][64] = {};
 
-// ===== PV storage =====
 static Move pvTable[MAX_PLY][MAX_PLY];
 static int pvLen[MAX_PLY];
 
-// ===== MVV/LVA =====
 static int pieceValue12[12] = {100, 320, 330, 500, 900, 10000, 100, 320, 330, 500, 900, 10000};
 static inline int mvvLvaScore(int attacker, int victim)
 {
@@ -83,7 +75,6 @@ static inline int mvvLvaScore(int attacker, int victim)
     return pieceValue12[victim] * 16 - (attacker != NO_PIECE ? pieceValue12[attacker] : 0);
 }
 
-// ===== make / unmake (local) =====
 struct UndoLocal
 {
     Move m;
@@ -128,7 +119,6 @@ static void doMoveLocal(Position &P, const Move &m, UndoLocal &u)
     int placeAs = m.promo ? m.promo : moving;
     place(P, placeAs, m.to);
 
-    // castling rook move
     if (moving == WK && abs(m.to - m.from) == 2)
     {
         if (m.to == G1)
@@ -156,7 +146,6 @@ static void doMoveLocal(Position &P, const Move &m, UndoLocal &u)
         }
     }
 
-    // castle rights
     auto clearCastleOnRookSq = [&](int sq)
     {
         if (sq == H1)
@@ -177,7 +166,7 @@ static void doMoveLocal(Position &P, const Move &m, UndoLocal &u)
     if (u.capPiece != NO_PIECE && u.capSq != -1)
         clearCastleOnRookSq(u.capSq);
 
-    // ep
+    
     P.epSq = -1;
     if (isPawn && abs((int) m.to - (int) m.from) == 16)
         P.epSq = (P.stm == WHITE ? (m.from + 8) : (m.from - 8));
@@ -230,7 +219,6 @@ static void undoMoveLocal(Position &P, const UndoLocal &u)
     P.updateOcc();
 }
 
-// ===== move ordering =====
 static int scoreMove(const Position &P, const Move &m, int ply)
 {
     int moving   = pieceAt(P, m.from);
@@ -251,7 +239,6 @@ static int scoreMove(const Position &P, const Move &m, int ply)
     return 0;
 }
 
-// --- Quiescence search ---
 static int quiesce(Position &P, int alpha, int beta)
 {
     if (g_stop.load(std::memory_order_relaxed))
@@ -304,7 +291,6 @@ static int quiesce(Position &P, int alpha, int beta)
     return alpha;
 }
 
-// ===== helpers for pruning/reductions =====
 static bool inCheck(const Position &P)
 {
     return sqAttacked(P, P.kingSq[P.stm], (P.stm == WHITE ? BLACK : WHITE));
@@ -312,7 +298,7 @@ static bool inCheck(const Position &P)
 
 static int null_move_prune(Position &P, int depth, int alpha, int beta, int ply)
 {
-    (void) alpha; // suppress unused warning
+    (void) alpha; 
     if (depth < 3 || inCheck(P))
         return -INF;
 
@@ -350,7 +336,6 @@ static bool givesCheck(Position &P, const Move &m)
     return chk;
 }
 
-// ===== negamax =====
 static int negamax(Position &P, int depth, int alpha, int beta, int ply)
 {
     if (g_stop.load(std::memory_order_relaxed))
@@ -364,7 +349,7 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
         if (elapsed >= g_timeLimitMs.load(std::memory_order_relaxed))
         {
             g_stop.store(true, std::memory_order_relaxed);
-            return 0; // return whatever—ID will keep previous best move
+            return 0; 
         }
     }
 
@@ -373,7 +358,6 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
 
     uint64_t key = compute_zobrist(P);
 
-    // TT probe
     if (TTEntry *e = g_tt.probe(key); e->key == key)
     {
         int ttScore = from_tt_score(e->score, ply);
@@ -381,7 +365,6 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
         {
             if (e->flag == TT_EXACT)
             {
-                // Seed PV at root so GUI always shows a move on TT hit
                 if (ply == 0 && (e->move.from | e->move.to))
                 {
                     pvLen[0]      = 1;
@@ -401,7 +384,7 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
     if (depth == 0)
         return quiesce(P, alpha, beta);
 
-    // Null-move try
+    
     int nm = null_move_prune(P, depth, alpha, beta, ply);
     if (nm >= beta)
     {
@@ -439,7 +422,6 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
     {
         int d = depth - 1;
 
-        // LMR for later, quiet, non-check moves
         bool cap      = isCapture(P, m);
         bool chk      = false;
         int reduction = 0;
@@ -453,15 +435,15 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
         UndoLocal u{};
         doMoveLocal(P, m, u);
 
-        int sc = -negamax(P, d - reduction, -alpha, -alpha - 1, ply + 1); // null-window first
+        int sc = -negamax(P, d - reduction, -alpha, -alpha - 1, ply + 1); 
         if (reduction && sc > alpha)
         {
-            sc = -negamax(P, d, -beta, -alpha, ply + 1); // re-search
+            sc = -negamax(P, d, -beta, -alpha, ply + 1); 
         }
         else if (!reduction)
         {
             if (moveIndex == 0)
-                sc = -negamax(P, d, -beta, -alpha, ply + 1); // full for first
+                sc = -negamax(P, d, -beta, -alpha, ply + 1); 
             else
             {
                 sc = -negamax(P, d, -alpha - 1, -alpha, ply + 1);
@@ -512,7 +494,6 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply)
     return bestScore;
 }
 
-// ===== Iterative deepening =====
 SearchResult search_iterative(Position &P, int maxDepth)
 {
     for (auto &k : killer1)
@@ -534,7 +515,6 @@ SearchResult search_iterative(Position &P, int maxDepth)
 
         int score = negamax(P, d, alpha, beta, 0);
 
-        // --- capture PV for *this* iteration ---
         std::vector<Move> line;
         for (int i = 0; i < pvLen[0]; ++i)
             line.push_back(pvTable[0][i]);
@@ -543,7 +523,6 @@ SearchResult search_iterative(Position &P, int maxDepth)
         r.bestScore = score;
         r.pv        = line;
 
-        // --- build PV string from current line ---
         std::ostringstream pvss;
         auto sqTo = [&](int s)
         {
@@ -572,18 +551,15 @@ SearchResult search_iterative(Position &P, int maxDepth)
             pvss << s;
         }
 
-        // --- time/nodes/nps ---
         using namespace std::chrono;
         unsigned long long ms    = (unsigned long long) duration_cast<milliseconds>(steady_clock::now() - g_t0).count();
         unsigned long long nodes = search_get_nodes();
         unsigned long long nps   = ms ? (nodes * 1000ull / ms) : 0ull;
 
-        // --- per-iteration info ---
         cout << "info depth " << d << " score cp " << r.bestScore << " nodes " << nodes << " time " << ms << " nps "
              << nps << " pv " << pvss.str() << "\n"
              << flush;
 
-        // aspiration for next iter
         alpha = score - 50;
         beta  = score + 50;
         if (alpha < -INF + 100)

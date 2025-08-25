@@ -8,7 +8,7 @@ uint64_t Z_EP[8];
 
 void init_zobrist()
 {
-    std::mt19937_64 rng(0x9E3779B97F4A7C15ULL); // fixed seed for reproducibility
+    std::mt19937_64 rng(0x9E3779B97F4A7C15ULL);
     auto r = [&] { return rng(); };
 
     for (int p = 0; p < 12; ++p)

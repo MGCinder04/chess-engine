@@ -36,15 +36,12 @@ struct Position
     void setStart();
 };
 
-// Movegen / rules
 bool sqAttacked(const Position &P, int sq, Side by);
 void legalMoves(Position &P, vector<Move> &out);
 
-// Perft (testing)
 uint64_t perft(Position &P, int d);
 void perftSplit(Position &P, int depth);
 
 
-// NEW: apply UCI moves to the current position
-bool applyUCIMove(Position &P, const string &uci);              // e.g., "e2e4", "a7a8q"
-bool applyUCIMoves(Position &P, const vector<string> &ms); // applies all, returns false if any fail
+bool applyUCIMove(Position &P, const string &uci);              
+bool applyUCIMoves(Position &P, const vector<string> &ms); 

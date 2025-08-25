@@ -13,15 +13,15 @@ enum TTFlag : uint8_t
 struct TTEntry
 {
     uint64_t key{0};
-    Move move{};               // best move from this node
-    int16_t score{0};          // stored score (with mate distance encoded)
-    int8_t depth{(int8_t) -1}; // search depth of this entry
+    Move move{};               
+    int16_t score{0};          
+    int8_t depth{(int8_t) -1}; 
     uint8_t flag{TT_EXACT};
 };
 
 class TT
 {
-    std::vector<TTEntry> table; // single-slot TT (simple & fast)
+    std::vector<TTEntry> table; 
     uint64_t mask;
 
   public:
@@ -29,7 +29,6 @@ class TT
     {
         size_t bytes = mb * 1024 * 1024;
         size_t n     = bytes / sizeof(TTEntry);
-        // round to next power of two
         size_t pow2 = 1;
         while (pow2 < n)
             pow2 <<= 1;

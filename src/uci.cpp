@@ -13,7 +13,7 @@ extern void tt_clear();
 
 using namespace std;
 
-static int g_moveOverheadMs = 30; // default
+static int g_moveOverheadMs = 30; 
 
 static inline void runUciLoop()
 {
@@ -36,7 +36,7 @@ static inline void runUciLoop()
         }
         else if (line == "ucinewgame")
         {
-            tt_clear(); // clear TT between games
+            tt_clear(); 
             P.setStart();
             cout << "info string new game\n" << flush;
         }
@@ -53,7 +53,6 @@ static inline void runUciLoop()
                 return s;
             };
 
-            // helper: apply tokens one-by-one and report the first failure
             auto apply_tokens = [&](vector<string> &ms)
             {
                 for (size_t i = 0; i < ms.size(); ++i)
@@ -73,7 +72,6 @@ static inline void runUciLoop()
             {
                 P.setStart();
 
-                // optional moves after startpos
                 size_t mpos = line.find(" moves ");
                 if (mpos != string::npos)
                 {
@@ -83,12 +81,11 @@ static inline void runUciLoop()
                     string tok;
                     while (iss >> tok)
                         ms.push_back(tok);
-                    (void) apply_tokens(ms); // apply & report if anything fails
+                    (void) apply_tokens(ms); 
                 }
             }
             else
             {
-                // "position fen <FEN> [moves ...]"
                 const string key = "position fen ";
                 size_t pos            = line.find(key);
                 if (pos == string::npos)
@@ -113,7 +110,7 @@ static inline void runUciLoop()
                         string tok;
                         while (iss >> tok)
                             ms.push_back(tok);
-                        (void) apply_tokens(ms); // apply & report if anything fails
+                        (void) apply_tokens(ms); 
                     }
                 }
             }
@@ -135,7 +132,6 @@ static inline void runUciLoop()
             cout << "info string eval " << cp << " cp (white POV), " << stm_cp << " cp (side-to-move POV)\n"
                       << flush;
         }
-        // optional tiny tester for parseMove/moveToUCI
         else if (line.rfind("echo ", 0) == 0)
         {
             string mv = line.substr(5);
@@ -149,11 +145,10 @@ static inline void runUciLoop()
         {
             break;
         }
-        // uci.cpp (ADD inside runUciLoop command loop)
         else if (line.rfind("go", 0) == 0)
         {
-            int depth          = -1; // -1 = unlimited (we’ll cap by time)
-            long long movetime = -1; // in ms; -1 = none
+            int depth          = -1; 
+            long long movetime = -1; 
 
             {
                 std::istringstream ss(line);
@@ -166,11 +161,9 @@ static inline void runUciLoop()
                         ss >> movetime;
                 }
             }
-
-            // Start timers/counters
+            
             search_set_start_time();
 
-            // Set a time limit if movetime provided
             if (movetime > 0)
             {
                 long long budget = movetime - g_moveOverheadMs;
@@ -180,15 +173,13 @@ static inline void runUciLoop()
             }
             else
             {
-                search_set_time_limit_ms(0); // no limit
+                search_set_time_limit_ms(0); 
             }
 
-            // choose depth to call (fallback if only movetime is set)
-            int callDepth = (depth > 0 ? depth : 99); // large depth; time will stop the search
+            int callDepth = (depth > 0 ? depth : 99); 
 
             auto res = search_iterative(P, callDepth);
 
-            // Fallbacks so we never output 0000
             if (res.pv.empty())
             {
                 Move m{};
@@ -245,17 +236,15 @@ static inline void runUciLoop()
 
         else if (line.rfind("setoption", 0) == 0)
         {
-            // parse: setoption name XXX value YYY
             std::string name, value;
             std::istringstream ss(line);
             std::string tok;
-            ss >> tok; // setoption
+            ss >> tok; 
             while (ss >> tok)
             {
                 if (tok == "name")
                 {
                     name.clear();
-                    // read until "value" or end
                     while (ss >> tok && tok != "value")
                     {
                         if (!name.empty())
@@ -288,7 +277,6 @@ static inline void runUciLoop()
             }
             else if (name == "Threads")
             {
-                // stored but unused (engine is single-threaded now)
                 int thr = 1;
                 try
                 {

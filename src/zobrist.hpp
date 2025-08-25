@@ -4,8 +4,8 @@
 
 extern uint64_t Z_PCS[12][64];
 extern uint64_t Z_SIDE;
-extern uint64_t Z_CASTLE[16]; // castle mask fits 4 bits (W_K,W_Q,B_K,B_Q -> 0..15)
-extern uint64_t Z_EP[8];      // ep file a..h
+extern uint64_t Z_CASTLE[16]; 
+extern uint64_t Z_EP[8];      
 
 void init_zobrist();
 
@@ -25,7 +25,6 @@ inline uint64_t compute_zobrist(const Position &P)
     if (P.stm == BLACK)
         k ^= Z_SIDE;
 
-    // castling: mask is already compatible with 0..15
     k ^= Z_CASTLE[P.castle & 0x0F];
 
     if (P.epSq != -1)

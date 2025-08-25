@@ -94,13 +94,10 @@ template <Side S> static void genPseudo(const Position &P, vector<Move> &out)
     constexpr Side T = (S == WHITE ? BLACK : WHITE);
     const U64 own = P.occ[S], opp = P.occ[T], empty = ~P.occAll;
 
-    // Pawns
     U64 PBB = (S == WHITE ? P.bb12[WP] : P.bb12[BP]);
 
-    // Single pushes
     U64 single = (S == WHITE ? ((PBB << 8) & empty) : ((PBB >> 8) & empty));
 
-    // Double pushes (start rank + both squares empty)
     U64 dbl;
     if constexpr (S == WHITE)
     {
@@ -111,7 +108,6 @@ template <Side S> static void genPseudo(const Position &P, vector<Move> &out)
         dbl = (((PBB & RANK_7) >> 16) & empty & (empty >> 8));
     }
 
-    // Captures (use file masks before shifting)
     U64 caps;
     if constexpr (S == WHITE)
     {
@@ -126,7 +122,6 @@ template <Side S> static void genPseudo(const Position &P, vector<Move> &out)
         caps      = (left | right) & opp;
     }
 
-    // Materialize pawn moves
     U64 s = single;
     while (s)
     {
@@ -177,7 +172,6 @@ template <Side S> static void genPseudo(const Position &P, vector<Move> &out)
         }
     }
 
-    // En passant (reverse lookup on ep square)
     if (P.epSq != -1)
     {
         int to          = P.epSq;
@@ -230,7 +224,6 @@ template <Side S> static void genPseudo(const Position &P, vector<Move> &out)
     int kf = P.kingSq[S];
     push(kf, KING_ATK[kf]);
 
-    // Castling (with through-check safety)
     if constexpr (S == WHITE)
     {
         if ((P.castle & W_K) && sqEmpty(P, F1) && sqEmpty(P, G1) && !sqAttacked(P, E1, BLACK) &&
@@ -259,7 +252,6 @@ void legalMoves(Position &P, vector<Move> &out)
     for (auto &m : ps)
     {
         Undo u; 
-        // state to save:
         u.stm        = P.stm;
         u.m          = m;
         u.capPiece   = NO_PIECE;
@@ -284,12 +276,10 @@ void legalMoves(Position &P, vector<Move> &out)
             u.capSq    = m.to;
             removeP(P, cap, m.to);
         }
-        // move piece
         removeP(P, moving, m.from);
         int placeAs = m.promo ? m.promo : moving;
         place(P, placeAs, m.to);
 
-        // castle rook
         if (moving == WK && abs(m.to - m.from) == 2)
         {
             if (m.to == G1)
@@ -316,7 +306,6 @@ void legalMoves(Position &P, vector<Move> &out)
                 place(P, BR, D8);
             }
         }
-        // rights
         auto clearCastleOnRookSq = [&](int sq)
         {
             if (sq == H1)
@@ -336,7 +325,6 @@ void legalMoves(Position &P, vector<Move> &out)
             clearCastleOnRookSq(m.from);
         if (u.capPiece == WR || u.capPiece == BR)
             clearCastleOnRookSq(u.capSq);
-        // ep target
         P.epSq = -1;
         if (isPawn && abs(m.to - m.from) == 16)
             P.epSq = (m.to + m.from) / 2;
@@ -344,12 +332,10 @@ void legalMoves(Position &P, vector<Move> &out)
         P.updateOcc();
         P.stm = (P.stm == WHITE ? BLACK : WHITE);
 
-        // legality test: after make, side-to-move attacks mover's king?
         bool inCheck = sqAttacked(P, P.kingSq[(P.stm == WHITE) ? BLACK : WHITE], P.stm);
         if (!inCheck)
             out.push_back(m);
 
-        // unmake (reverse order)
         P.stm     = u.stm;
         P.castle  = u.prevCastle;
         P.epSq    = u.prevEp;
@@ -392,39 +378,154 @@ void legalMoves(Position &P, vector<Move> &out)
     }
 }
 
-// position.cpp (ADD)
+
 void doMove(Position &P, const Move &m, Undo &u)
 {
-    // --- Save pre-move state into Undo (match what you already save in legalMoves) ---
     u.stm        = P.stm;
     u.m          = m;
-    u.capPiece   = NO_PIECE; // set below if capture happens
+    u.capPiece   = NO_PIECE;
     u.capSq      = -1;
     u.prevCastle = P.castle;
     u.prevEp     = P.epSq;
 
-    // ====== MAKE MOVE  (EXACTLY the same logic you already do inside legalMoves before the "inCheck" test) ======
-    // You already have helpers like pieceAt, place, removeP, etc. Reuse the same code path:
-    // 1) detect moving piece, capture (incl. en-passant), promotions
-    // 2) update rook move for castling (if king moved two squares)
-    // 3) update castle rights (moved king/rook or captured rook)
-    // 4) set/reset ep square on double pawn push
-    // 5) update occupancy, side-to-move flip
-    //
-    // ---- COPY THE SAME BODY YOU USE IN legalMoves(...) FOR THE "make" PART, up to:
-    // P.updateOcc(); P.stm = (P.stm == WHITE ? BLACK : WHITE);
-    //
-    // (No legality test here!)
-    // =================================================================================
+    int moving  = pieceAt(P, m.from);
+    int cap     = pieceAt(P, m.to);
+    bool isPawn = (moving == WP || moving == BP);
+    bool isEP   = isPawn && (m.to == P.epSq) && (cap == NO_PIECE);
+
+    if (isEP)
+    {
+        int takenSq = (P.stm == WHITE ? m.to - 8 : m.to + 8);
+        u.capPiece  = (P.stm == WHITE ? BP : WP);
+        u.capSq     = takenSq;
+        removeP(P, u.capPiece, takenSq);
+    }
+    else if (cap != NO_PIECE)
+    {
+        u.capPiece = cap;
+        u.capSq    = m.to;
+        removeP(P, cap, m.to);
+    }
+
+    removeP(P, moving, m.from);
+    int placeAs = m.promo ? m.promo : moving;
+    place(P, placeAs, m.to);
+
+    if (moving == WK)
+        P.kingSq[WHITE] = m.to;
+    if (moving == BK)
+        P.kingSq[BLACK] = m.to;
+
+    if (moving == WK && std::abs(m.to - m.from) == 2)
+    {
+        if (m.to == G1)
+        {
+            removeP(P, WR, H1);
+            place(P, WR, F1);
+        }
+        else if (m.to == C1)
+        {
+            removeP(P, WR, A1);
+            place(P, WR, D1);
+        }
+    }
+    if (moving == BK && std::abs(m.to - m.from) == 2)
+    {
+        if (m.to == G8)
+        {
+            removeP(P, BR, H8);
+            place(P, BR, F8);
+        }
+        else if (m.to == C8)
+        {
+            removeP(P, BR, A8);
+            place(P, BR, D8);
+        }
+    }
+
+    auto clearCastleOnRookSq = [&](int sq)
+    {
+        if (sq == H1)
+            P.castle &= ~W_K;
+        if (sq == A1)
+            P.castle &= ~W_Q;
+        if (sq == H8)
+            P.castle &= ~B_K;
+        if (sq == A8)
+            P.castle &= ~B_Q;
+    };
+
+    if (moving == WK)
+        P.castle &= ~(W_K | W_Q);
+    if (moving == BK)
+        P.castle &= ~(B_K | B_Q);
+
+    if (moving == WR || moving == BR)
+        clearCastleOnRookSq(m.from);
+    if (u.capPiece == WR || u.capPiece == BR)
+        clearCastleOnRookSq(u.capSq);
+
+    P.epSq = -1;
+    if (isPawn && std::abs(m.to - m.from) == 16)
+        P.epSq = (m.to + m.from) / 2;
+
+    P.updateOcc();
+    P.stm = (P.stm == WHITE ? BLACK : WHITE);
 }
 
 void undoMove(Position &P, const Undo &u)
 {
-    // ====== UNMAKE MOVE  (EXACTLY the same logic you already do in legalMoves) ======
-    // COPY the reverse sequence from legalMoves(...) (and perft(...)) that restores:
-    // P.stm, P.castle, P.epSq, moves the piece back, restores captured piece (incl. ep),
-    // reverts rook moves from castling, un-promotes, updates kingSq, then P.updateOcc().
-    // =================================================================================
+    const Move &m = u.m;
+
+    P.stm    = u.stm;
+    P.castle = u.prevCastle;
+    P.epSq   = u.prevEp;
+
+    int movedNow = pieceAt(P, m.to);
+
+    if ((movedNow == WK || movedNow == BK) && std::abs(m.to - m.from) == 2)
+    {
+        if (movedNow == WK)
+        {
+            if (m.to == G1)
+            {
+                removeP(P, WR, F1);
+                place(P, WR, H1);
+            }
+            else if (m.to == C1)
+            {
+                removeP(P, WR, D1);
+                place(P, WR, A1);
+            }
+        }
+        else
+        {
+            if (m.to == G8)
+            {
+                removeP(P, BR, F8);
+                place(P, BR, H8);
+            }
+            else if (m.to == C8)
+            {
+                removeP(P, BR, D8);
+                place(P, BR, A8);
+            }
+        }
+    }
+
+    removeP(P, movedNow, m.to);
+    int orig = m.promo ? (u.stm == WHITE ? WP : BP) : movedNow;
+    place(P, orig, m.from);
+
+    if (orig == WK)
+        P.kingSq[WHITE] = m.from;
+    if (orig == BK)
+        P.kingSq[BLACK] = m.from;
+
+    if (u.capPiece != NO_PIECE && u.capSq != -1)
+        place(P, u.capPiece, u.capSq);
+
+    P.updateOcc();
 }
 
 uint64_t perft(Position &P, int d)
@@ -436,7 +537,6 @@ uint64_t perft(Position &P, int d)
     uint64_t n = 0;
     for (auto &m : mv)
     {
-        // lightweight make/unmake (reuse legalMoves logic would redo legality)
         Undo u;
         u.stm        = P.stm;
         u.m          = m;
@@ -517,7 +617,6 @@ uint64_t perft(Position &P, int d)
 
         n += perft(P, d - 1);
 
-        // unmake
         P.stm     = u.stm;
         P.castle  = u.prevCastle;
         P.epSq    = u.prevEp;
@@ -577,7 +676,6 @@ void perftSplit(Position &P, int depth)
     uint64_t total = 0;
     for (const auto &m : root)
     {
-        // make
         Undo u;
         u.stm        = P.stm;
         u.m          = m;
@@ -658,7 +756,6 @@ void perftSplit(Position &P, int depth)
 
         uint64_t n = perft(P, depth - 1);
 
-        // unmake
         P.stm     = u.stm;
         P.castle  = u.prevCastle;
         P.epSq    = u.prevEp;

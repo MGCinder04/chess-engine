@@ -6,7 +6,6 @@
 
 using namespace std;
 
-// --- small helpers we mirror (non-API) ---
 static inline U64 sqbbU(unsigned s)
 {
     return 1ull << s;
@@ -35,7 +34,6 @@ static inline bool isBlackPiece(int p)
     return p >= BP && p <= BK;
 }
 
-// --- detect capture/ep on current P for move m ---
 static bool isCapture(const Position &P, const Move &m)
 {
     int capHere = pieceAt(P, m.to);
@@ -44,11 +42,10 @@ static bool isCapture(const Position &P, const Move &m)
     int moving  = pieceAt(P, m.from);
     bool isPawn = (moving == WP || moving == BP);
     if (isPawn && m.to == P.epSq)
-        return true; // en passant capture
+        return true; 
     return false;
 }
 
-// --- Apply/Unapply lightweight (for +/# and SAN disambiguation) ---
 static void doMake(Position &P, const Move &m, Undo &u)
 {
     u.stm        = P.stm;
@@ -184,11 +181,9 @@ static void doUnmake(Position &P, const Undo &u)
     P.updateOcc();
 }
 
-// --- Build SAN for a legal move m in position P ---
 string moveToSAN(Position &P, const Move &m)
 {
     int moving = pieceAt(P, m.from);
-    // Castling
     if (moving == WK && abs(m.to - m.from) == 2)
     {
         return (m.to == G1 ? "O-O" : "O-O-O");
@@ -202,13 +197,11 @@ string moveToSAN(Position &P, const Move &m)
     bool capture = isCapture(P, m);
     bool pawn    = (moving == WP || moving == BP);
 
-    // Piece letter (empty for pawn)
     if (!pawn)
     {
         const char letter[12] = {'P', 'N', 'B', 'R', 'Q', 'K', 'p', 'n', 'b', 'r', 'q', 'k'};
         char L                = letter[moving];
         s += toupper(L);
-        // disambiguation: if multiple same-piece can go to 'to', add file/rank/both
         vector<Move> leg;
         legalMoves(const_cast<Position &>(P), leg);
         int count = 0;
@@ -224,7 +217,6 @@ string moveToSAN(Position &P, const Move &m)
 
         if (count > 0)
         {
-            // choose minimal disambiguation
             bool anySameFile = false, anySameRank = false;
             for (auto &x : leg)
             {
@@ -257,7 +249,6 @@ string moveToSAN(Position &P, const Move &m)
     }
     else
     {
-        // Pawn: for captures include file letter of from
         if (capture)
             s += char('a' + (m.from % 8));
     }
@@ -266,7 +257,6 @@ string moveToSAN(Position &P, const Move &m)
         s += 'x';
     s += sqToStr(m.to);
 
-    // Promotion
     if (m.promo)
     {
         char pc = 'Q';
@@ -280,7 +270,6 @@ string moveToSAN(Position &P, const Move &m)
         s += pc;
     }
 
-    // Add '+' or '#'
     Undo u;
     doMake(P, m, u);
     bool oppInCheck = sqAttacked(P, P.kingSq[P.stm], (P.stm == WHITE ? BLACK : WHITE));
@@ -297,16 +286,15 @@ string moveToSAN(Position &P, const Move &m)
     return s;
 }
 
-// Normalize SAN token for matching.
 static string norm(const string &s)
 {
     string t;
     for (char c : s)
     {
         if (c == '0')
-            c = 'O'; // allow zero
+            c = 'O'; 
         if (c == '+' || c == '#' || c == '!' || c == '?')
-            continue; // ignore annotations and check/mate when matching
+            continue; 
         if (!isspace((unsigned char) c))
             t += c;
     }
@@ -316,12 +304,10 @@ static string norm(const string &s)
 bool parseSAN(const Position &P, const string &san, Move &out)
 {
     string want = norm(san);
-    // Try to match against generated legal moves’ SAN
     vector<Move> leg;
     legalMoves(const_cast<Position &>(P), leg);
     for (auto &m : leg)
     {
-        // We need a working Position copy to generate SAN (since it makes/unmakes)
         Position tmp  = P;
         string s = moveToSAN(tmp, m);
         if (norm(s) == want)
