@@ -1,13 +1,20 @@
 # ninja log v7
-14	1363	7778250736387880	CMakeFiles/ChessEngine.dir/src/main.cpp.obj	7ea0e2cadbd4e760
-11	453	7778292639680042	ChessEngine.exe	98c31566c62c0cd2
+11	1190	7778309786068101	CMakeFiles/ChessEngine.dir/src/main.cpp.obj	7ea0e2cadbd4e760
+4719	5206	7778295130562783	ChessEngine.exe	98c31566c62c0cd2
 125	654	7777359911023484	CMakeFiles/ChessEngine.dir/src/attacks.cpp.obj	f81362ae3b205297
 10	2413	7778288360567788	CMakeFiles/ChessEngine.dir/src/uci.cpp.obj	2292ffb0d5eed9a2
 128	2491	7778250737523380	CMakeFiles/ChessEngine.dir/src/position.cpp.obj	e5807922240fb5d7
-185	2166	7778250738098678	CMakeFiles/ChessEngine.dir/src/fen.cpp.obj	320c2a5e340fa89b
-322	1366	7778250739461976	CMakeFiles/ChessEngine.dir/src/eval.cpp.obj	3b34ede2296fc296
+218	2103	7778309788153161	CMakeFiles/ChessEngine.dir/src/fen.cpp.obj	320c2a5e340fa89b
+358	1413	7778309789540611	CMakeFiles/ChessEngine.dir/src/eval.cpp.obj	3b34ede2296fc296
 250	2136	7778250738743610	CMakeFiles/ChessEngine.dir/src/san.cpp.obj	aa50a7650e98ce05
-10	4673	7778292440397836	CMakeFiles/ChessEngine.dir/src/search.cpp.obj	a8d285096e5789d4
-455	1829	7778250740790171	CMakeFiles/ChessEngine.dir/src/zobrist.cpp.obj	e4ec0fa59e5755d1
 12	4718	7778295083493912	CMakeFiles/ChessEngine.dir/src/search.cpp.obj	a8d285096e5789d4
-4719	5206	7778295130562783	ChessEngine.exe	98c31566c62c0cd2
+455	1785	7778309790519845	CMakeFiles/ChessEngine.dir/src/zobrist.cpp.obj	e4ec0fa59e5755d1
+16	1278	7778317643857321	CMakeFiles/ChessEngine.dir/src/main.cpp.obj	7ea0e2cadbd4e760
+514	1534	7778317648820856	CMakeFiles/ChessEngine.dir/src/eval.cpp.obj	3b34ede2296fc296
+653	1991	7778317650216313	CMakeFiles/ChessEngine.dir/src/zobrist.cpp.obj	e4ec0fa59e5755d1
+368	2294	7778317647406433	CMakeFiles/ChessEngine.dir/src/fen.cpp.obj	320c2a5e340fa89b
+457	2377	7778317648251619	CMakeFiles/ChessEngine.dir/src/san.cpp.obj	aa50a7650e98ce05
+191	2644	7778317645600368	CMakeFiles/ChessEngine.dir/src/position.cpp.obj	e5807922240fb5d7
+100	2747	7778317644682417	CMakeFiles/ChessEngine.dir/src/uci.cpp.obj	2292ffb0d5eed9a2
+580	5117	7778317649480944	CMakeFiles/ChessEngine.dir/src/search.cpp.obj	a8d285096e5789d4
+5117	5640	7778317694860211	ChessEngine.exe	98c31566c62c0cd2

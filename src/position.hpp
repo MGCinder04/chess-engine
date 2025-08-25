@@ -4,13 +4,16 @@
 #include <string>
 #include <vector>
 
-using namespace std;
-
 struct Move
 {
     uint16_t from, to;
     uint8_t promo{0};
 };
+
+static inline bool sameMove(const Move &a, const Move &b)
+{
+    return a.from == b.from && a.to == b.to && a.promo == b.promo;
+}
 
 struct Undo
 {
@@ -30,18 +33,35 @@ struct Position
     Side stm = WHITE;
     int kingSq[2]{E1, E8};
     uint8_t castle = (W_K | W_Q | B_K | B_Q);
-    int epSq            = -1;
+    int epSq       = -1;
 
     void updateOcc();
     void setStart();
 };
 
+// Core helpers (used everywhere)
+static inline int pieceAt(const Position &P, int s)
+{
+    U64 m = sqbb((unsigned) s);
+    for (int p = WP; p <= BK; ++p)
+        if (P.bb12[p] & m)
+            return p;
+    return NO_PIECE;
+}
+static inline void removeP(Position &P, int p, int s)
+{
+    P.bb12[p] &= ~sqbb((unsigned) s);
+}
+static inline void place(Position &P, int p, int s)
+{
+    P.bb12[p] |= sqbb((unsigned) s);
+}
+
 bool sqAttacked(const Position &P, int sq, Side by);
-void legalMoves(Position &P, vector<Move> &out);
+void legalMoves(Position &P, std::vector<Move> &out);
 
 uint64_t perft(Position &P, int d);
 void perftSplit(Position &P, int depth);
 
-
-bool applyUCIMove(Position &P, const string &uci);              
-bool applyUCIMoves(Position &P, const vector<string> &ms); 
+bool applyUCIMove(Position &P, const std::string &uci);
+bool applyUCIMoves(Position &P, const std::vector<std::string> &ms);

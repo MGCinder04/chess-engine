@@ -10,14 +10,7 @@ static inline U64 sqbbU(unsigned s)
 {
     return 1ull << s;
 }
-static int pieceAt(const Position &P, int s)
-{
-    U64 m = sqbbU((unsigned) s);
-    for (int p = WP; p <= BK; ++p)
-        if (P.bb12[p] & m)
-            return p;
-    return NO_PIECE;
-}
+
 static inline string sqToStr(int s)
 {
     string t;

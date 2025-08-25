@@ -4,22 +4,6 @@
 
 using namespace std;
 
-static inline int pieceAt(const Position &P, int s)
-{
-    U64 m = sqbb((unsigned) s);
-    for (int p = WP; p <= BK; p++)
-        if (P.bb12[p] & m)
-            return p;
-    return NO_PIECE;
-}
-static inline void place(Position &P, int p, int s)
-{
-    P.bb12[p] |= sqbb((unsigned) s);
-}
-static inline void removeP(Position &P, int p, int s)
-{
-    P.bb12[p] &= ~sqbb((unsigned) s);
-}
 static inline bool sqEmpty(const Position &P, int sq)
 {
     return (P.occAll & sqbb((unsigned) sq)) == 0;

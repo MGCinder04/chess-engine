@@ -172,7 +172,7 @@ static inline void runUciLoop()
             int depth          = -1;
             long long movetime = -1;
 
-            // Parse: "go depth N" / "go movetime M"
+            // parse "go depth N" / "go movetime M"
             {
                 std::istringstream ss(line);
                 std::string tok;
@@ -196,69 +196,56 @@ static inline void runUciLoop()
             }
             else
             {
-                search_set_time_limit_ms(0); // no hard limit
+                search_set_time_limit_ms(0); // no limit
             }
 
             int callDepth = (depth > 0 ? depth : 99);
 
-            // Run search
             auto res = search_iterative(P, callDepth);
 
-            // Collect current legal moves at root (from current P.stm)
+            // collect current legal moves
             std::vector<Move> rootMoves;
             legalMoves(P, rootMoves);
 
-            if (rootMoves.empty())
-            {
-                cout << "info string DEBUG: no legal moves generated, but game not over?\n" << flush;
-            }
-
-            auto sameMove = [](const Move &a, const Move &b)
-            { return a.from == b.from && a.to == b.to && a.promo == b.promo; };
-
-            // Helper: ensure move is legal; otherwise use TT move; otherwise first legal; otherwise 0000
+            // fallback if search result is illegal or empty
             auto ensure_legal_best = [&](Move m) -> Move
             {
                 for (auto &lm : rootMoves)
                     if (sameMove(lm, m))
-                        return m; // ok
-                // Try TT move
+                        return m;
                 Move tt{};
                 if (search_root_tt_move(P, &tt))
                     for (auto &lm : rootMoves)
                         if (sameMove(lm, tt))
                             return tt;
-                // Fallback to first legal
                 if (!rootMoves.empty())
                 {
                     cout << "info string filtered illegal bestmove; using first legal\n" << flush;
                     return rootMoves[0];
                 }
-                // No legal moves (checkmate/stalemate)
-                return Move{0, 0, 0};
+                return Move{0, 0, 0}; // no legal moves
             };
 
-            // Prefer search result; fix it if needed
             res.bestMove = ensure_legal_best(res.bestMove);
-
-            // If search returned no PV, build a minimal one so GUIs are happy
             if (res.pv.empty() && (res.bestMove.from | res.bestMove.to))
                 res.pv = {res.bestMove};
 
 #ifndef NDEBUG
-            // Debug note if still not legal (shouldn't happen)
-            bool found = false;
-            for (auto &m : rootMoves)
-                if (sameMove(m, res.bestMove))
-                {
-                    found = true;
-                    break;
-                }
-            if (!found && (res.bestMove.from | res.bestMove.to))
-                cout << "info string DEBUG: bestmove not in legal set after filtering\n" << flush;
+            if (!rootMoves.empty())
+            {
+                bool found = false;
+                for (auto &m : rootMoves)
+                    if (sameMove(m, res.bestMove))
+                    {
+                        found = true;
+                        break;
+                    }
+                if (!found && (res.bestMove.from | res.bestMove.to))
+                    cout << "info string DEBUG: bestmove not in legal set after filtering\n" << flush;
+            }
 #endif
 
-            // Print result
+            // print move
             auto toUci = [&](const Move &m)
             {
                 auto sqTo = [&](int s)
@@ -284,7 +271,7 @@ static inline void runUciLoop()
             };
 
             if ((res.bestMove.from | res.bestMove.to) == 0)
-                cout << "bestmove 0000\n" << flush; // no legal moves
+                cout << "bestmove 0000\n" << flush;
             else
                 cout << "bestmove " << toUci(res.bestMove) << "\n" << flush;
         }

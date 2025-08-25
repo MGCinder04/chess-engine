@@ -1,14 +1,11 @@
 #include "fen.hpp"
-#include "attacks.hpp"
 #include "san.hpp"
 #include <cctype>
 #include <cstring>
 #include <sstream>
 #include <vector>
 
-using namespace std;
-
-static int sqFromStr(const string &s)
+static int sqFromStr(const std::string &s)
 {
     if (s.size() != 2)
         return -1;
@@ -51,110 +48,59 @@ static int pieceFromChar(char c)
     }
 }
 
-static inline int pieceAt(const Position &P, int s)
+bool setFromFEN(Position &P, const std::string &fen)
 {
-    U64 m = sqbb((unsigned) s);
-    for (int p = WP; p <= BK; ++p)
-        if (P.bb12[p] & m)
-            return p;
-    return NO_PIECE;
-}
-static inline void place(Position &P, int p, int s)
-{
-    P.bb12[p] |= sqbb((unsigned) s);
-}
-static inline void removeP(Position &P, int p, int s)
-{
-    P.bb12[p] &= ~sqbb((unsigned) s);
-}
-
-bool setFromFEN(Position &P, const string &fen)
-{
-    istringstream iss(fen);
-    string board, active, castling, ep, hm, fm;
+    std::istringstream iss(fen);
+    std::string board, active, castling, ep, hm, fm;
     if (!(iss >> board >> active >> castling >> ep))
         return false;
     iss >> hm >> fm;
 
     memset(P.bb12, 0, sizeof(P.bb12));
     int r = 7, f = 0;
-    for (size_t i = 0; i < board.size(); ++i)
+    for (char c : board)
     {
-        char c = board[i];
         if (c == '/')
         {
-            if (f != 8)
-                return false;
             --r;
             f = 0;
-            if (r < 0)
-                return false;
             continue;
         }
         if (isdigit((unsigned char) c))
         {
-            int cnt = c - '0';
-            if (cnt < 1 || cnt > 8)
-                return false;
-            f += cnt;
-            if (f > 8)
-                return false;
+            f += c - '0';
             continue;
         }
         int p = pieceFromChar(c);
-        if (p == NO_PIECE || f >= 8 || r < 0)
+        if (p == NO_PIECE)
             return false;
-        int sq = SQ(f, r);
-        P.bb12[p] |= sqbb((unsigned) sq);
+        P.bb12[p] |= sqbb(SQ(f, r));
         ++f;
     }
-    if (r != 0 || f != 8)
-        return false;
 
-    if (active == "w")
-        P.stm = WHITE;
-    else if (active == "b")
-        P.stm = BLACK;
-    else
-        return false;
-
+    P.stm    = (active == "w" ? WHITE : BLACK);
     P.castle = 0;
-    if (castling != "-")
+    for (char c : castling)
     {
-        for (char c : castling)
-        {
-            if (c == 'K')
-                P.castle |= W_K;
-            else if (c == 'Q')
-                P.castle |= W_Q;
-            else if (c == 'k')
-                P.castle |= B_K;
-            else if (c == 'q')
-                P.castle |= B_Q;
-            else
-                return false;
-        }
+        if (c == 'K')
+            P.castle |= W_K;
+        else if (c == 'Q')
+            P.castle |= W_Q;
+        else if (c == 'k')
+            P.castle |= B_K;
+        else if (c == 'q')
+            P.castle |= B_Q;
     }
-
-    if (ep == "-")
-        P.epSq = -1;
-    else
-    {
-        int s = sqFromStr(ep);
-        if (s < 0)
-            return false;
-        P.epSq = s;
-    }
-
+    P.epSq = (ep == "-" ? -1 : sqFromStr(ep));
     P.updateOcc();
     return true;
 }
 
-bool parseMove(const Position &P, const string &uci, Move &out)
+bool parseMove(const Position &P, const std::string &uci, Move &out)
 {
     if (uci.size() != 4 && uci.size() != 5)
         return false;
-    auto sqFrom2 = [](const string &s) -> int
+    auto sqFrom2 = [](const std::string &s) -> int
     {
         if (s.size() != 2)
             return -1;
@@ -186,17 +132,16 @@ bool parseMove(const Position &P, const string &uci, Move &out)
     return true;
 }
 
-static inline string sqToStr(int s)
+std::string moveToUCI(const Move &m)
 {
-    string t;
-    t += char('a' + (s % 8));
-    t += char('1' + (s / 8));
-    return t;
-}
-
-string moveToUCI(const Move &m)
-{
-    string s = sqToStr(m.from) + sqToStr(m.to);
+    auto sqToStr = [&](int s)
+    {
+        std::string t;
+        t += (char) ('a' + (s % 8));
+        t += (char) ('1' + (s / 8));
+        return t;
+    };
+    std::string s = sqToStr(m.from) + sqToStr(m.to);
     if (m.promo)
     {
         char pc = 'q';
@@ -211,6 +156,7 @@ string moveToUCI(const Move &m)
     return s;
 }
 
+// Apply move (no undo info)
 static void applyMoveNoUndo(Position &P, const Move &m)
 {
     int moving = pieceAt(P, m.from), cap = pieceAt(P, m.to);
@@ -219,18 +165,17 @@ static void applyMoveNoUndo(Position &P, const Move &m)
 
     if (isEP)
     {
-        int takenSq = (P.stm == WHITE ? m.to - 8 : m.to + 8);
-        int takenPc = (P.stm == WHITE ? BP : WP);
-        removeP(P, takenPc, takenSq);
+        int sq = (P.stm == WHITE ? m.to - 8 : m.to + 8);
+        int pc = (P.stm == WHITE ? BP : WP);
+        removeP(P, pc, sq);
     }
     else if (cap != NO_PIECE)
         removeP(P, cap, m.to);
 
     removeP(P, moving, m.from);
-    int placeAs = m.promo ? m.promo : moving;
-    place(P, placeAs, m.to);
+    place(P, (m.promo ? m.promo : moving), m.to);
 
-    if (moving == WK && abs((int) m.to - (int) m.from) == 2)
+    if (moving == WK && abs(m.to - m.from) == 2)
     {
         if (m.to == G1)
         {
@@ -243,7 +188,7 @@ static void applyMoveNoUndo(Position &P, const Move &m)
             place(P, WR, D1);
         }
     }
-    if (moving == BK && abs((int) m.to - (int) m.from) == 2)
+    if (moving == BK && abs(m.to - m.from) == 2)
     {
         if (m.to == G8)
         {
@@ -257,7 +202,7 @@ static void applyMoveNoUndo(Position &P, const Move &m)
         }
     }
 
-    auto clearCastleOnRookSq = [&](int sq)
+    auto clearCastle = [&](int sq)
     {
         if (sq == H1)
             P.castle &= ~W_K;
@@ -273,34 +218,27 @@ static void applyMoveNoUndo(Position &P, const Move &m)
     if (moving == BK)
         P.castle &= ~(B_K | B_Q);
     if (moving == WR || moving == BR)
-        clearCastleOnRookSq(m.from);
+        clearCastle(m.from);
     if (cap == WR || cap == BR)
-        clearCastleOnRookSq(m.to);
+        clearCastle(m.to);
 
     P.epSq = -1;
-    if (isPawn && abs((int) m.to - (int) m.from) == 16)
-        P.epSq = ((int) m.to + (int) m.from) / 2;
+    if (isPawn && abs(m.to - m.from) == 16)
+        P.epSq = (m.to + m.from) / 2;
 
     P.updateOcc();
     P.stm = (P.stm == WHITE ? BLACK : WHITE);
 }
 
-void applyMoveNoUndo_for_fencpp(Position &P, const Move &m)
-{
-    applyMoveNoUndo(P, m);
-}
-
-bool applyUCIMove(Position &P, const string &uci)
+bool applyUCIMove(Position &P, const std::string &uci)
 {
     Move want{};
     if (!parseMove(P, uci, want))
         return false;
-
-    vector<Move> legal;
+    std::vector<Move> legal;
     legalMoves(P, legal);
-    for (const auto &m : legal)
-        if (m.from == want.from && m.to == want.to &&
-            ((want.promo && m.promo == want.promo) || (!want.promo && m.promo == 0)))
+    for (auto &m : legal)
+        if (sameMove(m, want))
         {
             applyMoveNoUndo(P, m);
             return true;
@@ -308,37 +246,29 @@ bool applyUCIMove(Position &P, const string &uci)
     return false;
 }
 
-bool applyUCIMoves(Position &P, const vector<string> &ms)
+bool applyUCIMoves(Position &P, const std::vector<std::string> &ms)
 {
-    for (const auto &s : ms)
+    for (auto &s : ms)
         if (!applyUCIMove(P, s))
             return false;
     return true;
 }
 
-bool applyUserMove(Position &P, const string &token)
+bool applyUserMove(Position &P, const std::string &token)
 {
     if (applyUCIMove(P, token))
         return true;
     Move m{};
     if (parseSAN(P, token, m))
     {
-        vector<Move> legal;
+        std::vector<Move> legal;
         legalMoves(P, legal);
-        for (const auto &lm : legal)
-            if (lm.from == m.from && lm.to == m.to && lm.promo == m.promo)
+        for (auto &lm : legal)
+            if (sameMove(lm, m))
             {
-                applyMoveNoUndo_for_fencpp(P, lm);
+                applyMoveNoUndo(P, lm);
                 return true;
             }
     }
     return false;
-}
-
-bool applyUserMoves(Position &P, const vector<string> &tokens)
-{
-    for (const auto &t : tokens)
-        if (!applyUserMove(P, t))
-            return false;
-    return true;
 }

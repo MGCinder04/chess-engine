@@ -18,8 +18,9 @@ static int negamax(Position &P, int depth, int alpha, int beta, int ply);
 
 static TT g_tt(64); 
 
-static constexpr int INF     = 32000;
-static constexpr int MATE    = 30000;
+static constexpr int INF     = 30000;
+static constexpr int MATE    = 32000;
+
 static constexpr int MAX_PLY = 64;
 
 static std::atomic<bool> g_stop{false};
@@ -42,23 +43,6 @@ static inline int from_tt_score(int sc, int ply)
     if (sc < -MATE + 1000)
         return sc + ply;
     return sc;
-}
-
-static inline int pieceAt(const Position &P, int s)
-{
-    U64 m = sqbb((unsigned) s);
-    for (int p = WP; p <= BK; ++p)
-        if (P.bb12[p] & m)
-            return p;
-    return NO_PIECE;
-}
-static inline void removeP(Position &P, int p, int s)
-{
-    P.bb12[p] &= ~sqbb((unsigned) s);
-}
-static inline void place(Position &P, int p, int s)
-{
-    P.bb12[p] |= sqbb((unsigned) s);
 }
 
 static array<Move, MAX_PLY> killer1, killer2;
